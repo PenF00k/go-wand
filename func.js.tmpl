@@ -1,0 +1,33 @@
+{{ if .Subscription }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
+   try {
+      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+   } catch(error) {
+      console.error("Call of {{ .Name }} failed", error)
+   }
+}
+
+export async function cancel{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
+   try {
+      await cancelSubsriptionApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+   } catch(error) {
+      console.error("Call of {{ .Name }} failed", error)
+   }
+}
+{{ else }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) : Promise<{{ .ReturnType }}> {
+   try {
+        const jsonString = await runApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+        return JSON.parse(jsonString)
+   } catch(error) {
+        console.error("Call of {{ .Name }} failed", error)
+        throw error
+   }
+}
+{{ end }}

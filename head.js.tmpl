@@ -1,0 +1,18 @@
+/**
+ * GoCall library binding
+ * flow
+ */
+
+import {
+  NativeModules,
+  DeviceEventEmitter
+} from 'react-native';
+
+async function runApiCall(name: string, args :any[]) : Promise<any> {
+    const callData = JSON.stringify({
+      args,
+      method: name,
+    })
+
+    return NativeModules.GoCall.callMethod(callData)
+}

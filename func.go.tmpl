@@ -1,0 +1,60 @@
+{{define "argCast"}}
+{{if eq .Array}} 
+   outArray = make([]{{ .ClearType }})
+
+   return outArray
+{{end}}
+{{if eq .Type "string"}} return arg.(string){{else}}{{end}}
+{{end}}
+
+{{ if .Subscription }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
+   try {
+      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+   } catch(error) {
+      console.error("Call of {{ .Name }} failed", error)
+   }
+}
+
+export async function cancel{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
+   try {
+      await cancelSubsriptionApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+   } catch(error) {
+      console.error("Call of {{ .Name }} failed", error)
+   }
+}
+{{ else }}
+func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback callbackCaller) error {
+   args, ok := callData["args"].([]interface{})
+	if !ok {
+		return errors.New("not able to cast args, wrong type")
+	}
+
+   {{range $index, $item := .Params}}
+
+   {{ $item.Name }} = func (arg interface{}) {{ $item.Type }} {
+      {{ template "argCast" $item }}
+   }(args[{{$index}}])
+
+   {{ end }}
+
+   packageName.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}, callback)
+   return nil
+}
+
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+// export async function {}() : Promise<{{ .ReturnType }}> {
+//    try {
+//         const jsonString = await runApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+//         return JSON.parse(jsonString)
+//    } catch(error) {
+//         console.error("Call of {{ .Name }} failed", error)
+//         throw error
+//    }
+// }
+{{ end }}

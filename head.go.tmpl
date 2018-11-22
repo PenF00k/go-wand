@@ -1,0 +1,40 @@
+package mobile
+
+import (
+	"encoding/json"
+	"log"
+
+	"gitlab.vmassive.ru/gocallgen/goapi"
+	"gitlab.vmassive.ru/gocallgen/gotest"
+)
+
+// JsCallback the interface for any callbacks
+type JsCallback interface {
+	OnSuccess(json string)
+	OnError(json string)
+}
+
+type callbackCaller struct {
+	callback JsCallback
+}
+
+func (caller callbackCaller) OnSuccess(json string) {
+	caller.OnSuccess("")
+}
+
+func (caller callbackCaller) OnError(json string) {
+	caller.OnError("")
+}
+
+func newCaller(callback JsCallback) goapi.JsCallback {
+	return &callbackCaller{}
+}
+
+// CallMethod - call from JS
+func CallMethod(callData string, callback JsCallback) {
+	methodCallData := make(map[string]interface{})
+	json.Unmarshal([]byte(callData), &methodCallData)
+
+	methodName := methodCallData["method"]
+	log.Printf(">>> methodName %s", methodName)
+}
