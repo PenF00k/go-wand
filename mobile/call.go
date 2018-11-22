@@ -2,11 +2,11 @@ package mobile
 
 import (
 	"encoding/json"
-	"log"
 	"errors"
-	"strconv"
+	"log"
+
 	"gitlab.vmassive.ru/gocallgen/goapi"
-	"gitlab.vmassive.ru/gocallgen/gotest"
+	demo "gitlab.vmassive.ru/rn-demo"
 )
 
 // JsCallback the interface for any callbacks
@@ -15,35 +15,11 @@ type JsCallback interface {
 	OnError(json string)
 }
 
-// JsEvent the interface for any events
-type JsEvent interface {
-	OnEvent(eventName string, json string)
-}
-
-type eventerSender struct {
-	event		JsEvent
-	eventName 	string
-}
-
-func newEventSender(eventName string, event JsEvent) goapi.JsEvent {
-	return &eventerSender{
-		event: event,
-		eventName: eventName,
-	}
-}
-
-func (eventer eventerSender) OnEvent(json interface{}) {
-	log.Printf(" >> + << %#v", data)
-	bytes, _ := json.Marshal(data)
-	caller.event.OnEvent(eventer.eventName, string(bytes))
-}
-
 type callbackCaller struct {
 	callback JsCallback
 }
 
 func (caller callbackCaller) OnSuccess(data interface{}) {
-	log.Printf(" >> + << %#v", data)
 	bytes, _ := json.Marshal(data)
 	caller.callback.OnSuccess(string(bytes))
 }
@@ -54,9 +30,7 @@ func (caller callbackCaller) OnError(data interface{}) {
 }
 
 func newCaller(callback JsCallback) goapi.JsCallback {
-	return &callbackCaller{
-		callback: callback,
-	}
+	return &callbackCaller{}
 }
 
 // CallMethod - call from JS
@@ -64,17 +38,42 @@ func CallMethod(callData string, callback JsCallback) {
 	methodCallData := make(map[string]interface{})
 	json.Unmarshal([]byte(callData), &methodCallData)
 
-	methodName := methodCallData["method"].(string)
+	methodName := methodCallData["method"]
 	log.Printf(">>> methodName %s", methodName)
 
 	caller := newCaller(callback)
 	functionCall := callmap[methodName]
 	if functionCall != nil {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> calling methodName %s", methodName)
-
 		functionCall(methodCallData, caller)
 	} else {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> methodName not found %s", methodName)
-		caller.OnError("no such method: " + methodName)
+		caller.OnError("no such method: " + functionCall)
 	}
+}
+
+type CallFun func(map[string]interface{}, callbackCaller) error
+
+var callmap map[string]CallFun = make(map[string]CallFun)
+
+func init() {
+
+	callmap["SimpleCall"] = callAdapterForSimpleCall
+
+}
+
+func callAdapterForSimpleCall(callData map[string]interface{}, callback callbackCaller) error {
+	args, ok := callData["args"].([]interface{})
+	if !ok {
+		return errors.New("not able to cast args, wrong type")
+	}
+
+	body, err := func(arg interface{}) (string, error) {
+		return arg.(string), nil
+
+	}(args[0])
+	if err != nil {
+		return err
+	}
+
+	demo.SimpleCall(body, callback)
+	return nil
 }

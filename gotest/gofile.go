@@ -1,12 +1,8 @@
 package gotest
 
-import "encoding/json"
-
-// JsCallback the interface for any callbacks
-type JsCallback interface {
-	OnSuccess(json string)
-	OnError(json string)
-}
+import (
+	"gitlab.vmassive.ru/gocallgen/goapi"
+)
 
 // LovelyInterface My Comment
 type Simple struct {
@@ -30,7 +26,7 @@ type LovelyStructure struct {
 
 // CallAndGet use for your classes
 // @callback:LovelyStructure
-func CallAndGet(id string, params []int, callback JsCallback) {
+func CallAndGet(id string, params []int, callback goapi.JsCallback) {
 	ls := LovelyStructure{}
 	ExecuteCallback(ls, callback)
 }
@@ -39,13 +35,4 @@ func CallAndGet(id string, params []int, callback JsCallback) {
 // @subsription:Stage:
 func StageSubscription(id int) {
 
-}
-
-func ExecuteCallback(data interface{}, callback JsCallback) {
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		callback.OnError(err.Error())
-	} else {
-		callback.OnSuccess(string(bytes))
-	}
 }

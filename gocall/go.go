@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 
@@ -19,17 +20,23 @@ type Function struct {
 	ReturnType   string
 	Params       []Field
 	Subscription *string
+	Package      string
 }
 
 type Type struct {
-	Name  string
-	Inner string
+	Name       string
+	Map        bool
+	Array      bool
+	SimpleType string
+	Pointer    bool
+	InnerType  *Type
 }
 
 type Field struct {
 	Name       string
 	Type       string
 	Comment    []string
+	RichType   Type
 	Array      bool
 	SimpleType string
 }
@@ -47,6 +54,39 @@ func New(outDirectory string, packageName string) generator.Generator {
 }
 
 func (generator GoCodeGenerator) CreateCode(source *generator.CodeList) error {
+	err := generator.writeCode(source)
+	if err != nil {
+		return err
+	}
+
+	cmdImport := exec.Command("goimports", "-w", generator.outDirectory)
+	cmdImport.Dir = generator.outDirectory
+	cmdImport.Start()
+
+	cmd := exec.Command("go", "fmt")
+	cmd.Dir = generator.outDirectory
+	cmd.Start()
+
+	return nil
+}
+
+func writeMap(f io.Writer, source *generator.CodeList) error {
+	headBytes, err := ioutil.ReadFile("callmap.go.tmpl") // just pass the file name
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	headTemplate, err := template.New("header").Parse(string(headBytes))
+	if err != nil {
+		log.Errorf("failed to write head with error %v", err)
+		return err
+	}
+
+	return headTemplate.Execute(f, source)
+}
+
+func (generator GoCodeGenerator) writeCode(source *generator.CodeList) error {
 	outFile := "call.go"
 	log.Printf("createing %s", outFile)
 
@@ -58,18 +98,19 @@ func (generator GoCodeGenerator) CreateCode(source *generator.CodeList) error {
 
 	defer f.Close()
 	writeHeader(f)
-	writeFunctions(f, source)
+	writeMap(f, source)
+	writeFunctions(f, generator.packageName, source)
 
 	return nil
 }
 
-func writeFunctions(wr io.Writer, source *generator.CodeList) {
+func writeFunctions(wr io.Writer, pack string, source *generator.CodeList) {
 	for _, function := range source.Functions {
-		writeFunction(wr, function)
+		writeFunction(wr, pack, function)
 	}
 }
 
-func writeFunction(wr io.Writer, function generator.FunctionData) {
+func writeFunction(wr io.Writer, pack string, function generator.FunctionData) {
 	b, err := ioutil.ReadFile("func.go.tmpl") // just pass the file name
 	if err != nil {
 		log.Errorf("read file error %v", err)
@@ -82,19 +123,20 @@ func writeFunction(wr io.Writer, function generator.FunctionData) {
 		return
 	}
 
-	err = t.Execute(wr, createFunction(function))
+	err = t.Execute(wr, createFunction(pack, function))
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
 	}
 }
 
-func createFunction(function generator.FunctionData) Function {
+func createFunction(pack string, function generator.FunctionData) Function {
 	return Function{
 		Name:         function.Name,
 		Comments:     function.Comments,
 		ReturnType:   function.ReturnType,
 		Params:       createListOfFields(function.Params),
 		Subscription: function.Subscription,
+		Package:      pack,
 	}
 }
 
@@ -117,11 +159,16 @@ func writeHeader(f io.Writer) error {
 func createListOfFields(list *ast.FieldList) []Field {
 	fields := make([]Field, 0, 100)
 	for _, field := range list.List {
+		log.Printf(" <<<>>> typename ? %#+v", field.Type)
+
 		typeName := createType(field.Type)
 		if typeName == "" {
-			typeName = "any"
+			typeName = "interface{}"
 		}
 
+		richType := createRichType(field.Type)
+
+		log.Printf(" <<<>>> typename %s", typeName)
 		// Skip callback type
 		if typeName == "JsCallback" {
 			continue
@@ -129,9 +176,10 @@ func createListOfFields(list *ast.FieldList) []Field {
 
 		for _, name := range field.Names {
 			fieldInfo := Field{
-				Name:    name.Name,
-				Type:    typeName,
-				Comment: getComments(field.Doc),
+				Name:     name.Name,
+				Type:     typeName,
+				Comment:  getComments(field.Doc),
+				RichType: richType,
 			}
 
 			fields = append(fields, fieldInfo)
@@ -152,10 +200,49 @@ func getComments(commGroup *ast.CommentGroup) []string {
 	return comments
 }
 
+func createRichType(tp ast.Expr) Type {
+	Map := false
+	Array := false
+	SimpleType := "interface{}"
+	Pointer := false
+	var InnerType *Type
+
+	switch x := tp.(type) {
+	case *ast.Ident:
+		SimpleType = toTypeName(x.Name)
+
+	case *ast.MapType:
+		// return "map[" + createType(x.Key) + "]" + createType(x.Value)
+		Map = true
+		SimpleType = createType(x.Key)
+		inner := createRichType(x.Value)
+		InnerType = &inner
+
+	case *ast.StarExpr:
+		SimpleType = createType(x.X)
+		Pointer = true
+
+	case *ast.ArrayType:
+		SimpleType = createType(x.Elt)
+		Array = true
+	}
+
+	return Type{
+		SimpleType: SimpleType,
+		Array:      Array,
+		Map:        Map,
+		Pointer:    Pointer,
+		InnerType:  InnerType,
+	}
+}
+
 func createType(tp ast.Expr) string {
 	switch x := tp.(type) {
 	case *ast.Ident:
 		return toTypeName(x.Name)
+
+	case *ast.SelectorExpr:
+		return toTypeName(x.Sel.Name)
 
 	case *ast.MapType:
 		return "map[" + createType(x.Key) + "]" + createType(x.Value)

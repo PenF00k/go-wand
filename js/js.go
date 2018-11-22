@@ -95,6 +95,8 @@ func createJsType(tp ast.Expr) string {
 	switch x := tp.(type) {
 	case *ast.Ident:
 		return toJsName(x.Name)
+	case *ast.SelectorExpr:
+		return toJsName(x.Sel.Name)
 
 	case *ast.MapType:
 		return "{ [key: " + createJsType(x.Key) + "]: " + createJsType(x.Value) + "}"

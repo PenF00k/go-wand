@@ -13,7 +13,7 @@ func main() {
 
 	flag.StringVar(&src, "src", "", "directory name")
 	flag.StringVar(&output, "jsOut", "", "js output directory")
-	flag.StringVar(&output, "goOut", "", "js output directory")
+	flag.StringVar(&goOut, "goOut", "", "go output directory")
 
 	flag.Parse()
 

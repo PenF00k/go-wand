@@ -1,0 +1,11 @@
+
+type CallFun func(map[string]interface{}, goapi.JsCallback) error
+
+var callmap map[string]CallFun = make(map[string]CallFun)
+
+func init() {
+    {{range $_, $item := .Functions}}
+    {{ if $item.Subscription }}{{ else }}
+        callmap["{{ $item.Name }}"] =  callAdapterFor{{ $item.Name }}
+    {{ end }}{{end}}
+}
