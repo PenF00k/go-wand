@@ -2,21 +2,18 @@
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
-export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}, callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
+   subscription = DeviceEventEmitter.addListener('StageSubscription:', callback);
+
    try {
-      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}], (json: string) => { callback(JSON.parse(json)) })
    } catch(error) {
       console.error("Call of {{ .Name }} failed", error)
    }
+
+   return subscription
 }
 
-export async function cancel{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) {
-   try {
-      await cancelSubsriptionApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
-   } catch(error) {
-      console.error("Call of {{ .Name }} failed", error)
-   }
-}
 {{ else }}
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}

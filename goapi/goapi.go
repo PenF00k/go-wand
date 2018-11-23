@@ -1,10 +1,11 @@
 package goapi
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // JsCallback the interface for any callbacks
@@ -26,7 +27,7 @@ type Subscription interface {
 	Cancel()
 }
 
-func BuildSubsriptionName(funcName string, params ...interface{}) string {
+func BuildSubsriptionName(funcName string, params []interface{}) string {
 	list := make([]string, 0, len(params))
 	for _, param := range params {
 		switch x := param.(type) {
@@ -62,22 +63,29 @@ type CallFunc func(map[string]interface{}, JsCallback) error
 // SubFunc  type for general event function
 type SubFunc func(map[string]interface{}, EventCallback) (Subscription, error)
 
+type SubTypesFunc func(callData []interface{}) ([]interface{}, error)
+
+type subscriptionAdapter struct {
+	subscriptionFunc      SubFunc
+	subscriptionTypesFunc SubTypesFunc
+}
+
 type JsRegistry struct {
-	subscriptions        map[string]SubFunc
+	subscriptions        map[string]*subscriptionAdapter
 	functions            map[string]CallFunc
 	subscriptionRegistry SubscriptionRegistry
 }
 
 func NewJsRegistry() JsRegistry {
 	return JsRegistry{
-		subscriptions:        make(map[string]SubFunc),
+		subscriptions:        make(map[string]*subscriptionAdapter),
 		functions:            make(map[string]CallFunc),
 		subscriptionRegistry: NewSubscriptionRegistry(),
 	}
 }
 
-func (registry *JsRegistry) RegisterSubscription(eventName string, subFunc SubFunc) {
-	registry.subscriptions[eventName] = subFunc
+func (registry *JsRegistry) RegisterSubscription(eventName string, subFunc SubFunc, typeFunction SubTypesFunc) {
+	registry.subscriptions[eventName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
 }
 
 func (registry *JsRegistry) RegisterFunction(functionName string, adapterFunction CallFunc) {
@@ -88,40 +96,61 @@ func (registry *JsRegistry) RegisterEventCallback(callback JsEvent) {
 	registry.subscriptionRegistry.SetCallback(callback)
 }
 
-func (registry *JsRegistry) Subsribe(subscriptionData map[string]interface{}) {
-	eventName := subscriptionData["event"].(string)
-	subscriptionFunc := registry.subscriptions[eventName]
-	if subscriptionFunc != nil {
-		args, ok := subscriptionData["args"].([]interface{})
-		if ok {
-			eventName := BuildSubsriptionName(eventName, args)
-			registry.subscriptionRegistry.RegisterSubscription(eventName, subscriptionData, subscriptionFunc)
+func (registry *JsRegistry) Subscribe(subscriptionData map[string]interface{}) {
+	eventName, ok := subscriptionData["event"].(string)
+	if ok {
+		adapter := registry.subscriptions[eventName]
+		if adapter != nil {
+			args, ok := subscriptionData["args"].([]interface{})
+			if ok {
+				typedArgs, err := adapter.subscriptionTypesFunc(args)
+				if err == nil {
+					eventName = BuildSubsriptionName(eventName, typedArgs)
+					registry.subscriptionRegistry.RegisterSubscription(eventName, subscriptionData, adapter.subscriptionFunc)
+				}
+			} else {
+				log.Errorf("Can't handle event %s : %#+v", eventName, subscriptionData)
+			}
 		}
+	} else {
+		log.Errorf("Wrong subscribe call: no event field %#+v", subscriptionData)
 	}
 }
 
 func (registry *JsRegistry) CancelSubscription(subscriptionData map[string]interface{}) {
-	eventName := subscriptionData["event"].(string)
-	subscriptionFunc := registry.subscriptions[eventName]
-	if subscriptionFunc != nil {
-		args, ok := subscriptionData["args"].([]interface{})
-		if ok {
-			eventName := BuildSubsriptionName(eventName, args)
-			registry.subscriptionRegistry.CancelSubscription(eventName)
+	eventName, ok := subscriptionData["event"].(string)
+	if ok {
+		adapter := registry.subscriptions[eventName]
+		if adapter != nil {
+			args, ok := subscriptionData["args"].([]interface{})
+			if ok {
+				typedArgs, err := adapter.subscriptionTypesFunc(args)
+				if err == nil {
+					eventName = BuildSubsriptionName(eventName, typedArgs)
+					registry.subscriptionRegistry.CancelSubscription(eventName)
+				}
+			} else {
+				log.Errorf("No args in event request %s", eventName)
+			}
+		} else {
+			log.Errorf("No adapter for event %s", eventName)
 		}
+	} else {
+		log.Errorf("Wrong cancelSubscription call: no event field %#+v", subscriptionData)
 	}
 }
 
 func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback JsCallback) {
-	methodName := methodCallData["method"].(string)
-
-	functionCall := registry.functions[methodName]
-	if functionCall != nil {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> calling methodName %s", methodName)
-		functionCall(methodCallData, callback)
-	} else {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> methodName not found %s", methodName)
-		callback.OnError("no such method: " + methodName)
+	methodName, ok := methodCallData["method"].(string)
+	if ok {
+		functionCall := registry.functions[methodName]
+		if functionCall != nil {
+			log.Printf(">>>>>>>>>>>>>>>>>>>> calling methodName %s", methodName)
+			functionCall(methodCallData, callback)
+		} else {
+			log.Printf(">>>>>>>>>>>>>>>>>>>> methodName not found %s", methodName)
+			callback.OnError("no such method: " + methodName)
+		}
 	}
 }
 
@@ -190,7 +219,10 @@ func (registry *SubscriptionRegistry) CancelSubscription(eventName string) {
 		subsription.counter--
 		if subsription.counter == 0 {
 			registry.active[eventName] = nil
+			subsription.subscription.Cancel()
 		}
+	} else {
+		log.Errorf("Subsription already cancelled")
 	}
 }
 

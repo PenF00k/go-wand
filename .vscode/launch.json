@@ -9,8 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "args": ["-src=./", "-out=out"],
-            "program": "${workspaceFolder}"
+            "program": "${workspaceFolder}/goapi/remgo"
         }
     ]
 }

@@ -93,6 +93,26 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
    return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}},event)
 }
 
+
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+func subscriptionTypes{{ .Name }}(args []interface{}) ([]interface{}, error) {
+   {{range $index, $item := .Params}}
+
+   result := make([]interface{}, 0, len(args))
+
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   }(args[{{$index}}])
+   if err != nil {
+      return nil, err
+   }
+   result = append(result, {{ $item.Name }})
+   {{ end }}
+
+   return result, nil
+}
+
 {{ else }}
 func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.JsCallback) error {
    args, ok := callData["args"].([]interface{})

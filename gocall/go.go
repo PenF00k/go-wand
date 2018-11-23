@@ -95,9 +95,10 @@ func (generator GoCodeGenerator) writeCode(source *generator.CodeList) error {
 		log.Errorf("failed to create file %s", outFile)
 		return err
 	}
+	
 
 	defer f.Close()
-	writeHeader(f)
+	writeHeader(f, source)
 	writeMap(f, source)
 	writeFunctions(f, generator.packageName, source)
 
@@ -140,7 +141,7 @@ func createFunction(pack string, function generator.FunctionData) Function {
 	}
 }
 
-func writeHeader(f io.Writer) error {
+func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
 	headBytes, err := ioutil.ReadFile("head.go.tmpl") // just pass the file name
 	if err != nil {
 		log.Errorf("read file error %v", err)
@@ -153,7 +154,7 @@ func writeHeader(f io.Writer) error {
 		return err
 	}
 
-	return headTemplate.Execute(f, nil)
+	return headTemplate.Execute(f, sourceList)
 }
 
 func createListOfFields(list *ast.FieldList) []Field {

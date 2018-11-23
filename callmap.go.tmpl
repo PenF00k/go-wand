@@ -1,5 +1,5 @@
 
 func init() {
     {{range $_, $item := .Functions}}
-    {{ if $item.Subscription }}registry.RegisterSubscription("{{ $item.Name }}", subscribeTo{{ $item.Name }}){{ else }}registry.RegisterFunction("{{ $item.Name }}", callAdapterFor{{ $item.Name }}){{ end }}{{end}}
+    {{ if $item.Subscription }}registry.RegisterSubscription("{{ $item.Name }}", subscribeTo{{ $item.Name }}, subscriptionTypes{{ $item.Name }} ){{ else }}registry.RegisterFunction("{{ $item.Name }}", callAdapterFor{{ $item.Name }}){{ end }}{{end}}
 }

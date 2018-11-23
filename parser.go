@@ -35,7 +35,7 @@ func restoreCommentForType(commentMap *ast.CommentMap, fileSet *token.FileSet, t
 }
 
 // ParseFile - Parse file
-func Parse(src string, output string, goutput string) error {
+func Parse(src string, output string, goutput string, devMode bool, port int) error {
 	log.Printf("parsing files in %s", src)
 
 	fset := token.NewFileSet() // positions are relative to fset
@@ -46,7 +46,12 @@ func Parse(src string, output string, goutput string) error {
 		return err
 	}
 
-	codeList := &generator.CodeList{}
+	goPackageName := "mobile"
+	if devMode {
+		goPackageName = "main"
+	}
+
+	codeList := &generator.CodeList{Package: goPackageName, Dev: devMode, Port: port}
 	packageName := "unknown"
 
 	for name, pkg := range pkgs {

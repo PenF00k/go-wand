@@ -56,14 +56,14 @@ func (generator JsCodeGenerator) CreateCode(source *generator.CodeList) error {
 	}
 
 	defer f.Close()
-	writeHeader(f)
+	writeHeader(f, source)
 	writeFunctions(f, source)
 	writeStructures(f, source)
 
 	return nil
 }
 
-func writeHeader(f io.Writer) error {
+func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
 	headBytes, err := ioutil.ReadFile("head.js.tmpl") // just pass the file name
 	if err != nil {
 		log.Errorf("read file error %v", err)
@@ -76,7 +76,7 @@ func writeHeader(f io.Writer) error {
 		return err
 	}
 
-	return headTemplate.Execute(f, nil)
+	return headTemplate.Execute(f, sourceList)
 }
 
 func writeFunctions(wr io.Writer, source *generator.CodeList) {

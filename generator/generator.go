@@ -19,6 +19,9 @@ type ExportedStucture struct {
 }
 
 type CodeList struct {
+	Package    string
+	Dev        bool
+	Port       int
 	Structures []ExportedStucture
 	Functions  []FunctionData
 }

@@ -1,4 +1,4 @@
-package mobile
+package {{.Package}}
 
 import (
 	"encoding/json"
@@ -7,11 +7,41 @@ import (
 	"strconv"
 	"gitlab.vmassive.ru/gocallgen/goapi"
 	"gitlab.vmassive.ru/gocallgen/gotest"
+	{{if .Dev}}
+	"gitlab.vmassive.ru/gocallgen/goapi/remgo"
+	{{end}}
 )
 
 var registry goapi.JsRegistry = goapi.NewJsRegistry()
 
+{{if .Dev }}
+func serveHome(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
+	if r.URL.Path != "/" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.ServeFile(w, r, "home.html")
+}
 
+func main() {
+	hub := remgo.NewHub()
+	go hub.Run(&registry)
+
+	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		remgo.ServeWs(&registry, hub, w, r)
+	})
+	err := http.ListenAndServe("0.0.0.0:9009", nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
+}
+{{end}}
 // JsCallback the interface for any callbacks
 type JsCallback interface {
 	OnSuccess(json string)
@@ -66,7 +96,7 @@ func CallMethod(callData string, callback JsCallback) {
 	json.Unmarshal([]byte(callData), &methodCallData)
 
 	caller := newCaller(callback)
-	registry.Call(methodCallData, caller)	
+	registry.Call(methodCallData, caller)
 }
 
 
@@ -83,7 +113,7 @@ func Subscribe(callData string) {
 	methodCallData := make(map[string]interface{})
 	json.Unmarshal([]byte(callData), &methodCallData)
 
-	registry.Subsribe(methodCallData)
+	registry.Subscribe(methodCallData)
 }
 
 // Subscribe - subsribe from JS
