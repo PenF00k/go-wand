@@ -174,7 +174,7 @@ func createListOfFields(list *ast.FieldList) []Field {
 		}
 
 		// Skip callback type
-		if typeName == "JsCallback" {
+		if typeName == "JsCallback" || typeName == "EventCallback" {
 			continue
 		}
 

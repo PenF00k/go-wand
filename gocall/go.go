@@ -170,7 +170,7 @@ func createListOfFields(list *ast.FieldList) []Field {
 
 		log.Printf(" <<<>>> typename %s", typeName)
 		// Skip callback type
-		if typeName == "JsCallback" {
+		if typeName == "JsCallback" || typeName == "EventCallback" {
 			continue
 		}
 

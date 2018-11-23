@@ -9,6 +9,9 @@ import (
 	"gitlab.vmassive.ru/gocallgen/gotest"
 )
 
+var registry goapi.JsRegistry = goapi.NewJsRegistry()
+
+
 // JsCallback the interface for any callbacks
 type JsCallback interface {
 	OnSuccess(json string)
@@ -22,20 +25,18 @@ type JsEvent interface {
 
 type eventerSender struct {
 	event		JsEvent
-	eventName 	string
 }
 
-func newEventSender(eventName string, event JsEvent) goapi.JsEvent {
+func newEventSender(event JsEvent) goapi.JsEvent {
 	return &eventerSender{
 		event: event,
-		eventName: eventName,
 	}
 }
 
-func (eventer eventerSender) OnEvent(json interface{}) {
+func (eventer eventerSender) OnEvent(eventName string, data interface{}) {
 	log.Printf(" >> + << %#v", data)
 	bytes, _ := json.Marshal(data)
-	caller.event.OnEvent(eventer.eventName, string(bytes))
+	eventer.event.OnEvent(eventName, string(bytes))
 }
 
 type callbackCaller struct {
@@ -64,17 +65,29 @@ func CallMethod(callData string, callback JsCallback) {
 	methodCallData := make(map[string]interface{})
 	json.Unmarshal([]byte(callData), &methodCallData)
 
-	methodName := methodCallData["method"].(string)
-	log.Printf(">>> methodName %s", methodName)
-
 	caller := newCaller(callback)
-	functionCall := callmap[methodName]
-	if functionCall != nil {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> calling methodName %s", methodName)
+	registry.Call(methodCallData, caller)	
+}
 
-		functionCall(methodCallData, caller)
-	} else {
-		log.Printf(">>>>>>>>>>>>>>>>>>>> methodName not found %s", methodName)
-		caller.OnError("no such method: " + methodName)
-	}
+
+func RegisterEventCallback(callback JsEvent) {
+	registry.RegisterEventCallback(newEventSender(callback))
+}
+
+func RemoveEventCallback() {
+	registry.RegisterEventCallback(nil)
+}
+
+// Subscribe - subsribe from JS
+func Subscribe(callData string) {
+	methodCallData := make(map[string]interface{})
+	json.Unmarshal([]byte(callData), &methodCallData)
+
+	registry.Subsribe(methodCallData)
+}
+
+// Subscribe - subsribe from JS
+func Cancel(callData string) {
+	methodCallData := make(map[string]interface{})
+	registry.CancelSubscription(methodCallData)
 }

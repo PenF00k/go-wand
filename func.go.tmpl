@@ -76,10 +76,10 @@
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
-func subscribeTo{{ .Name }}(callData map[string]interface{}) error {
+func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCallback) (goapi.Subscription, error) {
    args, ok := callData["args"].([]interface{})
 	if !ok {
-		return errors.New("not able to cast args, wrong type")
+		return nil,errors.New("not able to cast args, wrong type")
 	}
 
    {{range $index, $item := .Params}}
@@ -87,11 +87,10 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}) error {
    {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(args[{{$index}}])
    if err != nil {
-      return err
+      return nil, err
    }{{ end }}
 
-   {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}})
-   return nil
+   return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}},event)
 }
 
 {{ else }}

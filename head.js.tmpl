@@ -16,3 +16,22 @@ async function runApiCall(name: string, args :any[]) : Promise<any> {
 
     return NativeModules.GoCall.callMethod(callData)
 }
+
+
+async function subribeApiCall(name: string, args :any[]) : Promise<any> {
+    const callData = JSON.stringify({
+      args,
+      event: name,
+    })
+
+    return NativeModules.GoCall.subscribe(callData)
+}
+
+async function cancelSubsriptionApiCall(name: string, args :any[]) : Promise<any> {
+    const callData = JSON.stringify({
+      args,
+      event: name,
+    })
+
+    return NativeModules.GoCall.cancel(callData)
+}
