@@ -127,11 +127,11 @@ func readConfig(config string, watchMode bool, port int, dev bool) {
 		os.Mkdir(output, os.ModePerm)
 	}
 
-	Parse(src, output, goutput, remote, port)
+	Parse(src, output, goFullOutDir, remote, port)
 
 	if configuration.Deploy.AutoGin && (configuration.Deploy.Watch || watchMode) {
 		log.Printf("running gin")
-		cmd := exec.Command("open", "-a", "Terminal", "`pwd`")
+		cmd := exec.Command("open", "-a", "iterm", "`pwd`")
 		// cmd.Dir = goutput
 		cmd.Start()
 	}
@@ -161,7 +161,6 @@ func watchGo(src string, output string, goutput string, devMode bool, port int) 
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					log.Println("modified file:", event.Name)
 					Parse(src, output, goutput, devMode, port)
-
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
