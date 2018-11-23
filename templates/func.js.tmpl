@@ -1,0 +1,30 @@
+{{ if .Subscription }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}, callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
+   subscription = DeviceEventEmitter.addListener('StageSubscription:', callback);
+
+   try {
+      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}], (json: string) => { callback(JSON.parse(json)) })
+   } catch(error) {
+      console.error("Call of {{ .Name }} failed", error)
+   }
+
+   return subscription
+}
+
+{{ else }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}) : Promise<{{ .ReturnType }}> {
+   try {
+        const jsonString = await runApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
+        return JSON.parse(jsonString)
+   } catch(error) {
+        console.error("Call of {{ .Name }} failed", error)
+        throw error
+   }
+}
+{{ end }}

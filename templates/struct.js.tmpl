@@ -1,0 +1,7 @@
+/** {{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+export type {{ .Name }} = { {{range $_, $item := .Field}} {{range $_, $comment := $item.Comment }}
+    // {{ $comment }} {{end}}
+    {{ $item.Name }}: {{ $item.Type }}, {{end}}
+}

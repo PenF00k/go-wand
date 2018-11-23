@@ -1,0 +1,135 @@
+
+{{define "typeCast"}}
+   {{if eq .Type "string"}} return arg.(string), nil {{end}}
+   {{if eq .Type "int"}} 
+      str, ok := arg.(string) 
+      if ok {
+         return strconv.Atoi(str)
+      }
+      fl, ok := arg.(float64)
+      if ok {
+         return int(fl), nil
+      }
+
+      return arg.(int), nil
+   {{end}}
+   {{if eq .Type "float32"}} 
+      str, ok := arg.(string) 
+      if ok {
+         fl, err := strconv.ParseFloat(float32) 
+         if err == nil {
+            return fl
+         }
+         return 0, errors.New("invalid data")
+      }
+      return arg.(float32), nil
+   {{end}}
+{{end}}
+{{define "atomTypeCast"}}
+            {{if eq .SimpleType "string"}} return arg.(string), nil {{end}}
+            {{if eq .SimpleType "int"}} 
+               str, ok := arg.(string) 
+               if ok {
+                  return strconv.Atoi(str)
+               }
+
+               fl, ok := arg.(float64)
+               if ok {
+                  return int(fl), nil
+               }
+
+               return arg.(int), nil
+            {{end}}
+            {{if eq .SimpleType "float32"}} 
+               str, ok := arg.(string) 
+               if ok {
+                  fl, err := strconv.ParseFloat(float32) 
+                  if err == nil {
+                     return fl
+                  }
+                  return 0, errors.New("invalid data")
+               }
+               return arg.(float32), nil
+            {{end}}
+{{end}}
+{{define "argCast"}}{{if .RichType.Array}} 
+      argsSlice := arg.([]interface{}) 
+      outArray := make([]{{ .RichType.SimpleType }}, 0, len(argsSlice))
+
+      for _, element := range argsSlice {
+         item, err := func(arg interface{}) ({{ .RichType.SimpleType }}, error) {
+            {{template "atomTypeCast" .RichType}}
+         }(element)
+
+         if err != nil {
+            return outArray, err
+         }
+
+         outArray = append(outArray, item)         
+      }
+
+      return outArray, nil
+{{else}}{{template "typeCast" .}}{{end}}
+{{end}}
+
+{{ if .Subscription }}
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCallback) (goapi.Subscription, error) {
+   args, ok := callData["args"].([]interface{})
+	if !ok {
+		return nil,errors.New("not able to cast args, wrong type")
+	}
+
+   {{range $index, $item := .Params}}
+
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   }(args[{{$index}}])
+   if err != nil {
+      return nil, err
+   }{{ end }}
+
+   return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}},event)
+}
+
+
+/**{{range $_, $item := .Comments}}
+ * {{ $item }}{{end}}
+ */
+func subscriptionTypes{{ .Name }}(args []interface{}) ([]interface{}, error) {
+   {{range $index, $item := .Params}}
+
+   result := make([]interface{}, 0, len(args))
+
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   }(args[{{$index}}])
+   if err != nil {
+      return nil, err
+   }
+   result = append(result, {{ $item.Name }})
+   {{ end }}
+
+   return result, nil
+}
+
+{{ else }}
+func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.JsCallback) error {
+   args, ok := callData["args"].([]interface{})
+	if !ok {
+		return errors.New("not able to cast args, wrong type")
+	}
+
+   {{range $index, $item := .Params}}
+
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   }(args[{{$index}}])
+   if err != nil {
+      return err
+   }{{ end }}
+
+   {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}, callback)
+   return nil
+}
+
+{{ end }}

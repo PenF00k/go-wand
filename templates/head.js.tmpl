@@ -1,0 +1,204 @@
+/**
+ * GoCall library binding
+ * flow
+ */
+
+import {
+  NativeModules,
+  DeviceEventEmitter,
+  EmitterSubscription
+} from 'react-native';
+
+type GoSubscription = {
+   subsription: EmitterSubscription,
+   name: string,
+   args: any[],
+   devId: number,
+};
+
+{{if .Dev }}
+class RemoveDev {
+  server = ""
+  requestId = 1
+  call = {}
+  event = {}
+  ws:WebSocket
+  pendingList = []
+
+  constructor(server : string) {
+    this.server = server
+    this.connect()
+  }
+
+  connect = () => {
+    const ws = new WebSocket(this.server)
+    ws.onmessage = this.onMessage
+
+    this.ws = ws
+    this.ws.onopen = this.sendPending
+    ws.onclose = () => {
+       // Try to reconnect in 5 seconds
+       setTimeout(() => { this.connect()  }, 1000);
+   };
+  }
+
+  onMessage = (message: any) => {
+    const messages = message.data.split("\n")
+    messages.forEach((content: string) => {
+      const response = JSON.parse(content)
+
+      if (this.call[response.ID]) {
+        this.call[response.ID](response)
+      } else  if (response.EventName) {
+        this.event[response.EventName](response)
+      }
+    })
+  }
+
+  sendPending = () => {
+    this.pendingList.forEach(it => this.ws.send(it))
+  }
+
+  callMethod = (name: string, args :any[]) : Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const callData = {
+        args,
+        method: name,
+      }
+
+      const requestID = this.requestId++
+
+      this.call[requestID] = (response: any) => {
+        if (response.Success) {
+          resolve(JSON.stringify(response.Success))
+        } else {
+          reject(JSON.stringify(response.Error))
+        }
+
+        this.call[requestID] = null
+      }
+
+      const body = JSON.stringify({id: requestID, call: callData })
+      try  {
+        this.ws.send(body)
+      } catch (err) {
+        this.pendingList = [...this.pendingList, body]
+      }
+    })
+  }
+
+  cancel = (name: string, args :any[]) : GoSubscriptions => {
+    const callData = {
+      args,
+      event: name,
+    }
+
+    this.requestId++
+
+    this.event[eventName] = (response: any) => {
+      if (response.Body) {
+        callback(JSON.stringify(response.Body))
+      }
+    }
+
+    const body = JSON.stringify({id: this.requestId, cancel: callData })
+    try  {
+      this.ws.send(body)
+    } catch (err) {
+      this.pendingList = [...this.pendingList, body]
+    }
+
+    return { name, eventName, devId: this.requestId }
+  }
+
+  subscribe = (name: string, args :any[], eventName: string, callback: (json : String) => void) : GoSubscriptions => {
+    const callData = {
+      args,
+      event: name,
+    }
+
+    this.requestId++
+
+    this.event[eventName] = (response: any) => {
+      if (response.Body) {
+        callback(JSON.stringify(response.Body))
+      }
+    }
+
+    const body = JSON.stringify({id: this.requestId, subscribe: callData })
+    try  {
+      this.ws.send(body)
+    } catch (err) {
+      this.pendingList = [...this.pendingList, body]
+    }
+
+    return { name, eventName, devId: this.requestId }
+  }
+}
+
+const devCall = new RemoveDev("ws://localhost:{{.Port}}/ws");
+
+{{end}}
+
+function getName(name: string, args :any[]) : string {
+   body = args.reduce((acc:string, value: any) => {
+      if (acc == "") {
+         return value
+      }
+
+      return acc + " : " + value
+   }, "")
+
+   return `${name}:${body}`
+}
+
+function subribeApiCall(name: string, args :any[], callback: (json : String) => void) : GoSubscription {
+   {{if .Dev}}
+   const subscriptionName = getName(name, args)
+   return devCall.subscribe(name, args, subscriptionName, callback)
+   {{else}}
+   const subscriptionName = getName(name, args)
+   subsription = DeviceEventEmitter.addListener(subscriptionName, callback);
+
+   const callData = JSON.stringify({
+      args,
+      event: name,
+   })
+
+   NativeModules.GoCall.subscribe(callData)
+   
+   return {
+      args,
+      name,
+      subsription,
+   }
+   {{end}}
+}
+
+async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise<any> {
+   {{if .Dev}} 
+   const {name, args, subsription} = subscription
+   {{else}}
+    const callData = JSON.stringify({
+      args,
+      event: name,
+    })
+
+    subsription.remove()
+
+    return NativeModules.GoCall.cancel(callData)
+   {{end}}
+}
+
+async function runApiCall(name: string, args :any[]) : Promise<any> {
+   {{if .Dev}} 
+    return devCall.callMethod(name, args)
+   {{else}}
+    const callData = JSON.stringify({
+      args,
+      method: name,
+    })
+
+    return NativeModules.GoCall.callMethod(callData)
+   {{end}}
+}
