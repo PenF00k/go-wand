@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.vmassive.ru/gocallgen/assets"
 	"gitlab.vmassive.ru/gocallgen/generator"
 )
 
@@ -64,7 +65,20 @@ func (generator JsCodeGenerator) CreateCode(source *generator.CodeList) error {
 }
 
 func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
-	headBytes, err := ioutil.ReadFile("head.js.tmpl") // just pass the file name
+	// headBytes, err := ioutil.ReadFile("head.js.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	file, err := assets.Assets.Open("/templates/head.js.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	headBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return err
@@ -110,7 +124,20 @@ func createJsType(tp ast.Expr) string {
 }
 
 func writeFunction(wr io.Writer, function generator.FunctionData) {
-	b, err := ioutil.ReadFile("func.js.tmpl") // just pass the file name
+	// b, err := ioutil.ReadFile("func.js.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return
+	// }
+
+	file, err := assets.Assets.Open("/templates/func.js.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return
+	}
+
+	b, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return
@@ -129,7 +156,20 @@ func writeFunction(wr io.Writer, function generator.FunctionData) {
 }
 
 func writeStructure(wr io.Writer, structType generator.ExportedStucture) {
-	b, err := ioutil.ReadFile("struct.js.tmpl") // just pass the file name
+	// b, err := ioutil.ReadFile("struct.js.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return
+	// }
+
+	file, err := assets.Assets.Open("/templates/struct.js.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return
+	}
+
+	b, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return

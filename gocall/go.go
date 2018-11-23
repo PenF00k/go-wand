@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.vmassive.ru/gocallgen/assets"
 	"gitlab.vmassive.ru/gocallgen/generator"
 )
 
@@ -71,7 +72,20 @@ func (generator GoCodeGenerator) CreateCode(source *generator.CodeList) error {
 }
 
 func writeMap(f io.Writer, source *generator.CodeList) error {
-	headBytes, err := ioutil.ReadFile("callmap.go.tmpl") // just pass the file name
+	// headBytes, err := ioutil.ReadFile("callmap.go.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	file, err := assets.Assets.Open("/templates/callmap.go.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	headBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return err
@@ -95,7 +109,6 @@ func (generator GoCodeGenerator) writeCode(source *generator.CodeList) error {
 		log.Errorf("failed to create file %s", outFile)
 		return err
 	}
-	
 
 	defer f.Close()
 	writeHeader(f, source)
@@ -112,7 +125,20 @@ func writeFunctions(wr io.Writer, pack string, source *generator.CodeList) {
 }
 
 func writeFunction(wr io.Writer, pack string, function generator.FunctionData) {
-	b, err := ioutil.ReadFile("func.go.tmpl") // just pass the file name
+	// b, err := ioutil.ReadFile("func.go.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return
+	// }
+
+	file, err := assets.Assets.Open("/templates/func.go.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return
+	}
+
+	b, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return
@@ -142,7 +168,20 @@ func createFunction(pack string, function generator.FunctionData) Function {
 }
 
 func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
-	headBytes, err := ioutil.ReadFile("head.go.tmpl") // just pass the file name
+	// headBytes, err := ioutil.ReadFile("head.go.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	file, err := assets.Assets.Open("/templates/head.go.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	headBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return err
@@ -160,7 +199,6 @@ func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
 func createListOfFields(list *ast.FieldList) []Field {
 	fields := make([]Field, 0, 100)
 	for _, field := range list.List {
-		log.Printf(" <<<>>> typename ? %#+v", field.Type)
 
 		typeName := createType(field.Type)
 		if typeName == "" {
@@ -169,7 +207,6 @@ func createListOfFields(list *ast.FieldList) []Field {
 
 		richType := createRichType(field.Type)
 
-		log.Printf(" <<<>>> typename %s", typeName)
 		// Skip callback type
 		if typeName == "JsCallback" || typeName == "EventCallback" {
 			continue
