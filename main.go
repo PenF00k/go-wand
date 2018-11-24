@@ -1,148 +1,106 @@
 package main
 
 import (
-	"bufio"
-	"flag"
-	"io/ioutil"
+	"go/build"
 	"os"
-	"os/exec"
 	"path"
 
+	"gitlab.vmassive.ru/gocallgen/config"
+	"gitlab.vmassive.ru/gocallgen/generator"
+
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 
 	"github.com/fsnotify/fsnotify"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func main() {
-	var config string
+	app := cli.NewApp()
+	app.EnableBashCompletion = true
 
-	// flag.Bool("init", false, "init config file")
-	devMode := flag.Bool("dev", false, "do not use gomobile")
-	jsPort := flag.Int("jsDevPort", 9009, "port for js")
-	watchMode := flag.Bool("watch", false, "watch mode")
-	init := flag.Bool("init", false, "init")
-
-	flag.StringVar(&config, "config", "auto.yaml", "directory name")
-
-	flag.Parse()
-
-	if *init {
-		log.Printf("New config stored.")
-		storeConfig()
-		return
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "config",
+			Value: "gocall.yaml",
+			Usage: "configuration file",
+		},
 	}
 
-	readConfig(config, *watchMode, *jsPort, *devMode)
-}
+	app.Name = "gocallgen"
+	app.Usage = "link beetween go and js"
+	app.Action = func(c *cli.Context) error {
+		runApplication(c.String("config"), true)
+		return nil
+	}
 
-type Deploy struct {
-	MobileSource string
-	Js           string
-	AutoGin      bool
-	Remote       bool
-	Watch        bool
-	Port         int16
-}
+	app.Commands = []cli.Command{
+		{
+			Name:        "init",
+			Aliases:     []string{"i"},
+			Usage:       "create new config files",
+			Description: "This is how we describe describeit the function",
+			Action: func(c *cli.Context) error {
+				config.StoreConfig()
+				return nil
+			},
+		},
+	}
 
-type RunConfiguration struct {
-	Source string
-	Deploy Deploy
-}
-
-func storeConfig() {
-	configuration := RunConfiguration{}
-	configuration.Source = "./"
-	configuration.Deploy.Js = "./js"
-	configuration.Deploy.MobileSource = "./mobile"
-	configuration.Deploy.AutoGin = true
-	configuration.Deploy.Watch = true
-	configuration.Deploy.Remote = true
-	configuration.Deploy.Port = 3000
-
-	out, _ := yaml.Marshal(configuration)
-	// Use os.Create to create a file for writing.
-	f, err := os.Create("auto.yaml")
+	err := app.Run(os.Args)
 	if err != nil {
-		log.Errorf("not able to create auto.yaml")
-		return
+		log.Fatal(err)
 	}
-
-	defer f.Close()
-	// Create a new writer.
-	w := bufio.NewWriter(f)
-
-	// Write a string to the file.
-	w.Write(out)
-	// Flush.
-	w.Flush()
-
-	{
-		// Use os.Create to create a file for writing.
-		shell, err := os.Create(".run.sh")
-		if err != nil {
-			log.Errorf("not able to create auto.yaml")
-			return
-		}
-
-		defer shell.Close()
-		// Create a new writer.
-		wsh := bufio.NewWriter(shell)
-
-		// Write a string to the file.
-		wsh.Write([]byte("#/bin/bash\ngin -a 9009 run call.go\n"))
-		// Flush.
-		wsh.Flush()
-	}
-
-	os.Chmod(".run.sh", 0777)
 }
 
-func readConfig(config string, watchMode bool, port int, dev bool) {
-	data, err := ioutil.ReadFile(config)
-	if err != nil {
-		log.Errorf("Can not open config file")
-		return
+func getGoPath() string {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
 	}
 
-	configuration := RunConfiguration{}
-	err = yaml.Unmarshal([]byte(data), &configuration)
-	if err != nil {
-		log.Errorf("Can not open config file")
-
-		return
-	}
-
-	src := configuration.Source
-	output := configuration.Deploy.Js
-	remote := configuration.Deploy.Remote || dev
-	goutput := configuration.Deploy.MobileSource
-
-	goFullOutDir := path.Join(goutput, "mobile")
-	if _, err := os.Stat(goFullOutDir); os.IsNotExist(err) {
-		os.Mkdir(goFullOutDir, os.ModePerm)
-	}
-
-	if _, err := os.Stat(output); os.IsNotExist(err) {
-		os.Mkdir(output, os.ModePerm)
-	}
-
-	Parse(src, output, goFullOutDir, remote, port)
-
-	if configuration.Deploy.AutoGin && (configuration.Deploy.Watch || watchMode) {
-		log.Printf("running gin")
-		cmd := exec.Command("open", "-a", "iterm", "`pwd`")
-		// cmd.Dir = goutput
-		cmd.Start()
-	}
-
-	if configuration.Deploy.Watch || watchMode {
-		watchGo(src, output, goFullOutDir, remote, port)
-	}
-
+	return gopath
 }
 
-func watchGo(src string, output string, goutput string, devMode bool, port int) {
+func runApplication(configName string, dev bool) {
+	configuration, err := config.ReadConfig(configName)
+	if err != nil {
+		return
+	}
+
+	goPath := getGoPath()
+
+	fullGoSourcePath := path.Join(goPath, "src", configuration.Source.Package)
+	targetGoCallPath := path.Join(goPath, "src", configuration.Wrapper.Package)
+
+	createDirectory(targetGoCallPath)
+	createDirectory(configuration.Js.Path)
+
+	pathMap := generator.PathMap{
+		Source: fullGoSourcePath,
+		Target: targetGoCallPath,
+		Js:     configuration.Js.Path,
+	}
+
+	goPackageName := configuration.Wrapper.Package
+	if dev {
+		goPackageName = "main"
+	}
+
+	codeList := &generator.CodeList{
+		Package:       goPackageName,
+		Dev:           dev,
+		Port:          configuration.Wrapper.Port,
+		SourcePackage: configuration.Source.Package,
+		PathMap:       pathMap,
+		Config:        configuration,
+	}
+
+	watchGo(codeList)
+}
+
+func watchGo(codeList *generator.CodeList) {
+	Parse(codeList)
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -160,7 +118,7 @@ func watchGo(src string, output string, goutput string, devMode bool, port int) 
 				log.Println("event:", event)
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					log.Println("modified file:", event.Name)
-					Parse(src, output, goutput, devMode, port)
+					Parse(codeList)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -171,9 +129,15 @@ func watchGo(src string, output string, goutput string, devMode bool, port int) 
 		}
 	}()
 
-	err = watcher.Add(src)
+	err = watcher.Add(codeList.PathMap.Source)
 	if err != nil {
 		log.Fatal(err)
 	}
 	<-done
+}
+
+func createDirectory(dir string) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		os.Mkdir(dir, os.ModePerm)
+	}
 }

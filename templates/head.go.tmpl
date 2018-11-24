@@ -5,12 +5,13 @@ import (
 	"log"
 	"errors"
 	"strconv"
+	"net/http"
 	"gitlab.vmassive.ru/gocallgen/goapi"
-	{{if .Dev}}
-	"gitlab.vmassive.ru/gocallgen/goapi/remgo"
-	{{end}}
+	"{{ .SourcePackage }}"
+	{{if .Dev}}"gitlab.vmassive.ru/gocallgen/goapi/remgo"{{end}}
 )
 
+// Registry for all calls
 var registry goapi.JsRegistry = goapi.NewJsRegistry()
 
 {{if .Dev }}

@@ -60,9 +60,9 @@ func (generator GoCodeGenerator) CreateCode(source *generator.CodeList) error {
 		return err
 	}
 
-	cmdImport := exec.Command("goimports", "-w", generator.outDirectory)
-	cmdImport.Dir = generator.outDirectory
-	cmdImport.Start()
+	// cmdImport := exec.Command("goimports", "-w", generator.outDirectory)
+	// cmdImport.Dir = generator.outDirectory
+	// cmdImport.Start()
 
 	cmd := exec.Command("go", "fmt")
 	cmd.Dir = generator.outDirectory

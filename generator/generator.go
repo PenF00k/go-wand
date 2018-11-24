@@ -2,6 +2,8 @@ package generator
 
 import (
 	"go/ast"
+
+	"gitlab.vmassive.ru/gocallgen/config"
 )
 
 type FunctionData struct {
@@ -18,12 +20,21 @@ type ExportedStucture struct {
 	Field    *ast.FieldList
 }
 
+type PathMap struct {
+	Source string
+	Target string
+	Js     string
+}
+
 type CodeList struct {
-	Package    string
-	Dev        bool
-	Port       int
-	Structures []ExportedStucture
-	Functions  []FunctionData
+	Package       string
+	Dev           bool
+	Port          int16
+	SourcePackage string
+	Structures    []ExportedStucture
+	Functions     []FunctionData
+	Config        *config.Configuration
+	PathMap       PathMap
 }
 
 func (list *CodeList) AddStructure(structure ExportedStucture) {
