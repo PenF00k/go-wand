@@ -1,0 +1,7 @@
+source:
+  package: gitlab.vmassive.ru/rn-demo
+wrapper:
+  package: demolink
+  port: 9009
+js:
+  path: ../rn-demo/DemoApp
