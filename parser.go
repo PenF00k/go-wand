@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"reflect"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -47,6 +48,7 @@ func Parse(codeList *generator.CodeList) error {
 		return err
 	}
 
+	oldState := *codeList
 	codeList.Functions = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	codeList.Structures = make([]generator.ExportedStucture, 0, len(codeList.Functions)+8)
 
@@ -79,13 +81,24 @@ func Parse(codeList *generator.CodeList) error {
 		}
 	}
 
-	jsGen := js.New(codeList.PathMap.Js, packageName)
-	jsGen.CreateCode(codeList)
+	if hasChanges(codeList, &oldState) {
+		jsGen := js.New(codeList.PathMap.Js, packageName)
+		jsGen.CreateCode(codeList)
 
-	goGen := gocall.New(codeList.PathMap.Target, packageName)
-	goGen.CreateCode(codeList)
+		goGen := gocall.New(codeList.PathMap.Target, packageName)
+		goGen.CreateCode(codeList)
+	}
 
 	return nil
+}
+
+func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool {
+	if reflect.DeepEqual(newState.Functions, oldState.Functions) &&
+		reflect.DeepEqual(newState.Structures, oldState.Structures) {
+		return false
+	}
+
+	return true
 }
 
 func createFunctionParameters(funcDecl *ast.FuncDecl) generator.FunctionData {

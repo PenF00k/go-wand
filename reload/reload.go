@@ -103,9 +103,7 @@ func (reload *LiveReload) Run() error {
 			}
 
 			if info.IsDir() {
-				if path != reload.codeList.PathMap.Source {
-					watcher.Add(path)
-				}
+				watcher.Add(path)
 			}
 
 			return nil
@@ -135,6 +133,7 @@ func (reload *LiveReload) Run() error {
 					if event.Op&fsnotify.Rename == fsnotify.Rename ||
 						event.Op&fsnotify.Create == fsnotify.Create {
 						watcher.Add(event.Name)
+						reload.buildAndRun()
 					}
 
 					continue
@@ -145,8 +144,18 @@ func (reload *LiveReload) Run() error {
 			if ext != ".go" {
 				if event.Op&fsnotify.Remove == fsnotify.Remove {
 					watcher.Remove(event.Name)
+					reload.buildAndRun()
 				}
 
+				continue
+			}
+
+			absPath, err := filepath.Abs(event.Name)
+			if err != nil {
+				continue
+			}
+
+			if reload.codeList.PathMap.Source == absPath {
 				continue
 			}
 
