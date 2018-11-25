@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.vmassive.ru/gocallgen/assets"
-	"gitlab.vmassive.ru/gocallgen/generator"
+	"gitlab.vmassive.ru/wand/assets"
+	"gitlab.vmassive.ru/wand/generator"
 )
 
 type Function struct {

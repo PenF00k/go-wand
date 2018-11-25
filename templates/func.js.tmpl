@@ -2,7 +2,7 @@
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
-export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}: {{ $item.Type }}{{end}}, callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
+export async function {{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}: {{ $item.Type }},{{end}}callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
    subscription = DeviceEventEmitter.addListener('StageSubscription:', callback);
 
    try {

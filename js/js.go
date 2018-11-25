@@ -12,8 +12,8 @@ import (
 
 	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
-	"gitlab.vmassive.ru/gocallgen/assets"
-	"gitlab.vmassive.ru/gocallgen/generator"
+	"gitlab.vmassive.ru/wand/assets"
+	"gitlab.vmassive.ru/wand/generator"
 )
 
 type Field struct {
@@ -63,7 +63,7 @@ func (generator JsCodeGenerator) CreateCode(source *generator.CodeList) error {
 }
 
 func (gen JsCodeGenerator) writeWithFunctions(source *generator.CodeList) error {
-	outFile := gen.packageName + "Hocs.js"
+	outFile := gen.packageName + "HOC.js"
 
 	list := gen.getAnnotatedStructures(source)
 	if len(list) == 0 {
@@ -79,6 +79,8 @@ func (gen JsCodeGenerator) writeWithFunctions(source *generator.CodeList) error 
 	}
 
 	defer f.Close()
+
+	gen.writeWithHeader(f, source)
 
 	for _, item := range list {
 		var getFunc, updateFunc *generator.FunctionData
@@ -104,6 +106,53 @@ type WithData struct {
 	Props   []Field
 	Update  *Function
 	Get     *Function
+}
+
+type WithHeader struct {
+	Structures  []string
+	Functions   []string
+	PackageName string
+}
+
+func (gen JsCodeGenerator) writeWithHeader(f io.Writer, sourceList *generator.CodeList) error {
+	headBytes, err := ioutil.ReadFile("./templates/headWith.js.tmpl") // just pass the file name
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	// file, err := assets.Assets.Open("/templates/headWith.js.tmpl")
+	// defer file.Close()
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	// headBytes, err := ioutil.ReadAll(file)
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	header := WithHeader{
+		PackageName: gen.packageName,
+	}
+
+	for _, f := range sourceList.Functions {
+		header.Functions = append(header.Functions, strcase.ToLowerCamel(f.Name))
+	}
+
+	for _, s := range sourceList.Structures {
+		header.Structures = append(header.Structures, s.Name)
+	}
+
+	headTemplate, err := template.New("structType").Parse(string(headBytes))
+	if err != nil {
+		log.Errorf("failed to write head with error %v", err)
+		return err
+	}
+
+	return headTemplate.Execute(f, header)
 }
 
 func (gen JsCodeGenerator) writeWithFunction(wr io.Writer, get *generator.FunctionData, update *generator.FunctionData, strct generator.ExportedStucture) error {

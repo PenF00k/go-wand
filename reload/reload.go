@@ -15,7 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/fsnotify/fsnotify"
-	"gitlab.vmassive.ru/gocallgen/generator"
+	"gitlab.vmassive.ru/wand/generator"
 )
 
 type LiveReload struct {

@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.vmassive.ru/gocallgen/goapi"
+	"gitlab.vmassive.ru/wand/goapi"
 )
 
 var upgrader = websocket.Upgrader{

@@ -11,5 +11,11 @@ import {
 } from 'react-native';
 
 import {
+{{range $_, $item := .Functions}}
+  {{ $item }}, {{end}}
+{{range $_, $item := .Structures}}
+  type {{ $item }}, {{end}}
 
-} from './{{ .Package }}'
+} from './{{ .PackageName }}'
+
+const emptyArray = []

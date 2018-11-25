@@ -3,7 +3,7 @@ package generator
 import (
 	"go/ast"
 
-	"gitlab.vmassive.ru/gocallgen/config"
+	"gitlab.vmassive.ru/wand/config"
 )
 
 type Annotation struct {
@@ -18,6 +18,7 @@ type FunctionData struct {
 	Params       *ast.FieldList
 	Subscription *string
 	Annotation   []Annotation
+	CallName     string
 }
 
 type ExportedStucture struct {
@@ -35,6 +36,7 @@ type PathMap struct {
 
 type CodeList struct {
 	Package       string
+	PackageName   string
 	Dev           bool
 	Port          int16
 	SourcePackage string

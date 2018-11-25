@@ -7,9 +7,9 @@ import (
 	"path"
 	"syscall"
 
-	"gitlab.vmassive.ru/gocallgen/config"
-	"gitlab.vmassive.ru/gocallgen/generator"
-	"gitlab.vmassive.ru/gocallgen/reload"
+	"gitlab.vmassive.ru/wand/config"
+	"gitlab.vmassive.ru/wand/generator"
+	"gitlab.vmassive.ru/wand/reload"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -24,13 +24,13 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config",
-			Value: "gocall.yaml",
+			Value: "wand.yaml",
 			Usage: "configuration file",
 		},
 	}
 
-	app.Name = "gocallgen"
-	app.Usage = "link beetween go and js"
+	app.Name = "wand"
+	app.Usage = "magic link beetween go and js"
 	app.Action = func(c *cli.Context) error {
 		runApplication(c.String("config"), true)
 		return nil

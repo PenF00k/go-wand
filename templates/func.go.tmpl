@@ -1,6 +1,13 @@
 
 {{define "typeCast"}}
-   {{if eq .Type "string"}} return arg.(string), nil {{end}}
+   {{if eq .Type "string"}} 
+      str, ok := arg.(string)
+      if !ok {
+         return "", errors.New("wrong type, string is expected")
+      }
+
+      return str, nil
+   {{end}}
    {{if eq .Type "int"}} 
       str, ok := arg.(string) 
       if ok {
@@ -26,7 +33,14 @@
    {{end}}
 {{end}}
 {{define "atomTypeCast"}}
-            {{if eq .SimpleType "string"}} return arg.(string), nil {{end}}
+            {{if eq .SimpleType "string"}}
+               str, ok := arg.(string)
+               if !ok {
+                  return "", errors.New("wrong type, string is expected")
+               }
+
+               return str, nil
+            {{end}}
             {{if eq .SimpleType "int"}} 
                str, ok := arg.(string) 
                if ok {
@@ -77,10 +91,13 @@
  * {{ $item }}{{end}}
  */
 func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCallback) (goapi.Subscription, error) {
+   {{ $length := len .Params  }}
+   {{ if gt $length 0 }}
    args, ok := callData["args"].([]interface{})
-	if !ok {
-		return nil,errors.New("not able to cast args, wrong type")
-	}
+   if !ok {
+      return nil,errors.New("not able to cast args, wrong type")
+   }
+   {{ end }}
 
    {{range $index, $item := .Params}}
 
@@ -90,7 +107,7 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
       return nil, err
    }{{ end }}
 
-   return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}},event)
+   return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }},{{end}}event)
 }
 
 
@@ -98,9 +115,9 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
  * {{ $item }}{{end}}
  */
 func subscriptionTypes{{ .Name }}(args []interface{}) ([]interface{}, error) {
-   {{range $index, $item := .Params}}
-
    result := make([]interface{}, 0, len(args))
+
+   {{range $index, $item := .Params}}
 
    {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(args[{{$index}}])
@@ -115,10 +132,13 @@ func subscriptionTypes{{ .Name }}(args []interface{}) ([]interface{}, error) {
 
 {{ else }}
 func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.JsCallback) error {
+   {{ $length := len .Params  }}
+   {{ if gt $length 0 }}
    args, ok := callData["args"].([]interface{})
-	if !ok {
-		return errors.New("not able to cast args, wrong type")
-	}
+   if !ok {
+      return errors.New("not able to cast args, wrong type")
+   }
+   {{ end }}
 
    {{range $index, $item := .Params}}
 
@@ -128,7 +148,7 @@ func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.J
       return err
    }{{ end }}
 
-   {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}, callback)
+   {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}, {{end}} callback)
    return nil
 }
 

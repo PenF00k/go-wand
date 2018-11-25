@@ -7,11 +7,12 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.vmassive.ru/gocallgen/generator"
-	"gitlab.vmassive.ru/gocallgen/gocall"
-	"gitlab.vmassive.ru/gocallgen/js"
+	"gitlab.vmassive.ru/wand/generator"
+	"gitlab.vmassive.ru/wand/gocall"
+	"gitlab.vmassive.ru/wand/js"
 )
 
 func restoreCommentForType(commentMap *ast.CommentMap, fileSet *token.FileSet, typeSpec *ast.TypeSpec) {
@@ -80,6 +81,8 @@ func Parse(codeList *generator.CodeList) error {
 		}
 	}
 
+	codeList.PackageName = packageName
+
 	if hasChanges(codeList, &oldState) {
 		jsGen := js.New(codeList.PathMap.Js, packageName)
 		jsGen.CreateCode(codeList)
@@ -121,6 +124,7 @@ func createFunctionParameters(funcDecl *ast.FuncDecl) generator.FunctionData {
 		ReturnType:   returnType,
 		Name:         funcDecl.Name.Name,
 		Params:       funcDecl.Type.Params,
+		CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
 	}
 }
 

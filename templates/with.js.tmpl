@@ -4,34 +4,34 @@ type {{ .Name }}Prop = {
   {{ $item.Name }}: {{ $item.Type }},{{end}}
 }
 
-export function withStageApplications<Props: {} & {{ .Name }}Prop>(
-  WrappedComponent : ComponentType<{{ .Name }}Prop & { {{ .VarName }} : {{ .Name }[] }>
+export function with{{ .Name }}<Props: {} & {{ .Name }}Prop>(
+  WrappedComponent : ComponentType<{{ .Name }}Prop & { {{ .VarName }} : {{ .Name }} }>
 ) : ComponentType<Props> {
   return class {{ .Name }}DataView extends Component<Props, *> {
-    id = undefined
-    subscription = undefined
+    {{ if .Update }}subscription = undefined {{end}}
 
     constructor(props: Props) {
       super(props);
-      this.state = { data:  emptyArray }
+      this.state = {  {{ .VarName }} :  emptyArray }
     }
 
     componentDidMount() {
+      {{ $length := len .Get.Params }}
+      {{ if gt $length 0 }}
       const { {{range $index, $item := .Get.Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}} = this.props
+      {{ end }}
+
       {{ if .Get }}
       {{ .Get.Name }}({{range $index, $item := .Get.Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}})
-        .then(it => this.setState({ data: it }))
+        .then(this.onValue)
       {{ end }}
       {{ if .Update }}
-      this.subscription = {{ .Update.Name  }}(10, (item: {{ .Name }}) => {
-        console.log(data)
-        this.setState({ data: item })
-      })
+      this.subscription = {{ .Update.Name  }}({{range $index, $item := .Get.Params}}{{ $item.Name }},{{end}}this.onValue)
       {{ end }}
     }
 
-    onValue = (value: {{ .Name }}) => {
-      this.setState({ applications })
+    onValue = ({{ .VarName }}: {{ .Name }}) => {
+      this.setState({ {{ .VarName }} })
     }
 
     componentWillUnmount() {
@@ -40,11 +40,10 @@ export function withStageApplications<Props: {} & {{ .Name }}Prop>(
     }
 
     render() {
-      const { data } = this.state;
+      const {  {{ .VarName }}  } = this.state;
 
       return <WrappedComponent
-                {{ .VarName }}={data}
-                {...workerActions}
+                {{ .VarName }}={  {{ .VarName }}  }
                 {...this.props} />
     }
   }

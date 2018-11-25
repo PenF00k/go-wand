@@ -22,7 +22,7 @@ class RemoveDev {
   requestId = 1
   call = {}
   event = {}
-  ws:WebSocket
+  ws: WebSocket
   pendingList = []
 
   constructor(server : string) {
@@ -50,7 +50,9 @@ class RemoveDev {
       if (this.call[response.ID]) {
         this.call[response.ID](response)
       } else  if (response.EventName) {
-        this.event[response.EventName](response)
+        if (this.event[response.EventName]) {
+          this.event[response.EventName](response)
+        }
       }
     })
   }
