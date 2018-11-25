@@ -47,6 +47,9 @@ func Parse(codeList *generator.CodeList) error {
 		return err
 	}
 
+	codeList.Functions = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
+	codeList.Structures = make([]generator.ExportedStucture, 0, len(codeList.Functions)+8)
+
 	packageName := "unknown"
 
 	for name, pkg := range pkgs {

@@ -3,10 +3,13 @@ package main
 import (
 	"go/build"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 
 	"gitlab.vmassive.ru/gocallgen/config"
 	"gitlab.vmassive.ru/gocallgen/generator"
+	"gitlab.vmassive.ru/gocallgen/reload"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -107,16 +110,34 @@ func watchGo(codeList *generator.CodeList) {
 	}
 	defer watcher.Close()
 
+	rel, err := reload.New(codeList)
+	if err != nil {
+		return
+	}
+
+	shutdown(rel)
+
+	go rel.Run()
+
 	done := make(chan bool)
 	go func() {
 		for {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
+					done <- true
 					return
 				}
+				ext := path.Ext(event.Name)
+				if ext != ".go" {
+					continue
+				}
+
 				log.Println("event:", event)
-				if event.Op&fsnotify.Write == fsnotify.Write {
+				if event.Op&fsnotify.Write == fsnotify.Write ||
+					event.Op&fsnotify.Remove == fsnotify.Remove ||
+					event.Op&fsnotify.Rename == fsnotify.Rename ||
+					event.Op&fsnotify.Create == fsnotify.Create {
 					log.Println("modified file:", event.Name)
 					Parse(codeList)
 				}
@@ -140,4 +161,18 @@ func createDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, os.ModePerm)
 	}
+}
+
+func shutdown(runner *reload.LiveReload) {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := <-c
+		log.Println("Got signal: ", s)
+		err := runner.Kill()
+		if err != nil {
+			log.Print("Error killing: ", err)
+		}
+		os.Exit(1)
+	}()
 }

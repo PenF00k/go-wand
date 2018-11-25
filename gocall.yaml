@@ -1,5 +1,5 @@
 source:
-  package: gitlab.vmassive.ru/rn-demo
+  package: gitlab.vmassive.ru/demo
 wrapper:
   package: demolink
   port: 9009
