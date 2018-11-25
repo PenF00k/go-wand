@@ -1,0 +1,51 @@
+
+type {{ .Name }}Prop = {
+  {{range $index, $item := .Props}}
+  {{ $item.Name }}: {{ $item.Type }},{{end}}
+}
+
+export function withStageApplications<Props: {} & {{ .Name }}Prop>(
+  WrappedComponent : ComponentType<{{ .Name }}Prop & { {{ .VarName }} : {{ .Name }[] }>
+) : ComponentType<Props> {
+  return class {{ .Name }}DataView extends Component<Props, *> {
+    id = undefined
+    subscription = undefined
+
+    constructor(props: Props) {
+      super(props);
+      this.state = { data:  emptyArray }
+    }
+
+    componentDidMount() {
+      const { {{range $index, $item := .Get.Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}} = this.props
+      {{ if .Get }}
+      {{ .Get.Name }}({{range $index, $item := .Get.Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}})
+        .then(it => this.setState({ data: it }))
+      {{ end }}
+      {{ if .Update }}
+      this.subscription = {{ .Update.Name  }}(10, (item: {{ .Name }}) => {
+        console.log(data)
+        this.setState({ data: item })
+      })
+      {{ end }}
+    }
+
+    onValue = (value: {{ .Name }}) => {
+      this.setState({ applications })
+    }
+
+    componentWillUnmount() {
+     {{ if .Update }}cancelSubsriptionApiCall(this.subscription)
+     {{ end }}
+    }
+
+    render() {
+      const { data } = this.state;
+
+      return <WrappedComponent
+                {{ .VarName }}={data}
+                {...workerActions}
+                {...this.props} />
+    }
+  }
+}
