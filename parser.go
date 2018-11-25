@@ -77,7 +77,6 @@ func Parse(codeList *generator.CodeList) error {
 
 				return true
 			})
-
 		}
 	}
 
@@ -87,18 +86,28 @@ func Parse(codeList *generator.CodeList) error {
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName)
 		goGen.CreateCode(codeList)
+	} else {
+		log.Printf("no changes, skipping")
 	}
 
 	return nil
 }
 
 func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool {
-	if reflect.DeepEqual(newState.Functions, oldState.Functions) &&
-		reflect.DeepEqual(newState.Structures, oldState.Structures) {
-		return false
+	if len(newState.Functions) != len(oldState.Functions) {
+		return true
 	}
 
-	return true
+	if len(newState.Structures) != len(oldState.Structures) {
+		return true
+	}
+
+	if reflect.DeepEqual(newState.Functions, oldState.Functions) &&
+		reflect.DeepEqual(newState.Structures, oldState.Structures) {
+		return true
+	}
+
+	return false
 }
 
 func createFunctionParameters(funcDecl *ast.FuncDecl) generator.FunctionData {
@@ -129,6 +138,58 @@ func getCallbackAnnotatedType(comments []string) ([]string, string) {
 	}
 
 	return comments, "any"
+}
+
+var annotationList = []string{
+	"subsription",
+	"get",
+	"update",
+	"callback",
+}
+
+func getAnnotation(comments []string) ([]string, *generator.Annotation) {
+	if comments == nil || len(comments) == 0 {
+		return comments, nil
+	}
+
+	lastString := comments[len(comments)-1]
+
+	for _, annotationName := range annotationList {
+		keyword := "@" + annotationName + ":"
+		if strings.HasPrefix(lastString, keyword) {
+
+			callbackType := strings.TrimPrefix(lastString, keyword)
+			otherComments := comments[0 : len(comments)-1]
+			value := strings.TrimSpace(callbackType)
+
+			annotation := generator.Annotation{
+				Name:  annotationName,
+				Value: value,
+			}
+
+			return otherComments, &annotation
+		}
+	}
+
+	return comments, nil
+}
+
+func GetAnnotations(comments []string) ([]string, []generator.Annotation) {
+	annotations := make([]generator.Annotation, 0, 2)
+
+	outList, annotation := getAnnotation(comments)
+	if annotation != nil {
+		annotations = append(annotations, *annotation)
+	}
+
+	for len(outList) > 0 && annotation != nil {
+		outList, annotation = getAnnotation(comments)
+		if annotation != nil {
+			annotations = append(annotations, *annotation)
+		}
+	}
+
+	return outList, annotations
 }
 
 func getSubriptionAnnotatedType(comments []string) ([]string, *string) {
@@ -184,10 +245,14 @@ func getComments(commGroup *ast.CommentGroup) []string {
 }
 
 func createStructure(structType *ast.StructType, name string, commGroup *ast.CommentGroup) generator.ExportedStucture {
+	comments := getComments(commGroup)
+
+	comments, annotations := GetAnnotations(comments)
 
 	return generator.ExportedStucture{
-		Comments: getComments(commGroup),
-		Name:     name,
-		Field:    structType.Fields,
+		Comments:   comments,
+		Name:       name,
+		Field:      structType.Fields,
+		Annotation: annotations,
 	}
 }

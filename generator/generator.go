@@ -6,18 +6,25 @@ import (
 	"gitlab.vmassive.ru/gocallgen/config"
 )
 
+type Annotation struct {
+	Name  string
+	Value string
+}
+
 type FunctionData struct {
 	Name         string
 	Comments     []string
 	ReturnType   string
 	Params       *ast.FieldList
 	Subscription *string
+	Annotation   []Annotation
 }
 
 type ExportedStucture struct {
-	Comments []string
-	Name     string
-	Field    *ast.FieldList
+	Comments   []string
+	Name       string
+	Field      *ast.FieldList
+	Annotation []Annotation
 }
 
 type PathMap struct {
