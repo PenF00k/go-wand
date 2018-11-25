@@ -176,17 +176,12 @@ func getAnnotation(comments []string) ([]string, *generator.Annotation) {
 
 func GetAnnotations(comments []string) ([]string, []generator.Annotation) {
 	annotations := make([]generator.Annotation, 0, 2)
-
 	outList, annotation := getAnnotation(comments)
 	if annotation != nil {
-		annotations = append(annotations, *annotation)
-	}
+		outList, annotationList := GetAnnotations(outList)
+		list := append(annotationList, *annotation)
 
-	for len(outList) > 0 && annotation != nil {
-		outList, annotation = getAnnotation(comments)
-		if annotation != nil {
-			annotations = append(annotations, *annotation)
-		}
+		return outList, list
 	}
 
 	return outList, annotations

@@ -1,6 +1,7 @@
 package js
 
 import (
+	"errors"
 	"go/ast"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
 	"gitlab.vmassive.ru/gocallgen/assets"
 	"gitlab.vmassive.ru/gocallgen/generator"
@@ -47,6 +49,150 @@ func New(outDirectory string, packageName string) generator.Generator {
 }
 
 func (generator JsCodeGenerator) CreateCode(source *generator.CodeList) error {
+	err := generator.writeGeneral(source)
+	if err != nil {
+		return err
+	}
+
+	err = generator.writeWithFunctions(source)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (gen JsCodeGenerator) writeWithFunctions(source *generator.CodeList) error {
+	outFile := gen.packageName + "Hocs.js"
+
+	list := gen.getAnnotatedStructures(source)
+	if len(list) == 0 {
+		return nil
+	}
+
+	log.Printf("createing (with) %s", outFile)
+
+	f, err := os.Create(path.Join(gen.outDirectory, outFile))
+	if err != nil {
+		log.Errorf("failed to create file %s", outFile)
+		return err
+	}
+
+	defer f.Close()
+
+	for _, item := range list {
+		var getFunc, updateFunc *generator.FunctionData
+		get := gen.getAnnotation("get", item.Annotation)
+		if get != nil {
+			getFunc = gen.findFunction(*get, source.Functions)
+		}
+
+		update := gen.getAnnotation("update", item.Annotation)
+		if update != nil {
+			updateFunc = gen.findFunction(*update, source.Functions)
+		}
+
+		gen.writeWithFunction(f, getFunc, updateFunc, item)
+	}
+
+	return nil
+}
+
+type WithData struct {
+	VarName string
+	Name    string
+	Props   []Field
+	Update  *Function
+	Get     *Function
+}
+
+func (gen JsCodeGenerator) writeWithFunction(wr io.Writer, get *generator.FunctionData, update *generator.FunctionData, strct generator.ExportedStucture) error {
+	headBytes, err := ioutil.ReadFile("./templates/with.js.tmpl") // just pass the file name
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
+
+	// file, err := assets.Assets.Open("/templates/head.js.tmpl")
+	// defer file.Close()
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	// headBytes, err := ioutil.ReadAll(file)
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	funcDecl := get
+	if get == nil {
+		funcDecl = update
+	}
+
+	if funcDecl == nil {
+		return errors.New("not declared update or get")
+	}
+
+	withData := WithData{
+		Name:    strct.Name,
+		VarName: strcase.ToLowerCamel(strct.Name),
+		Props:   createListOfFields(funcDecl.Params),
+	}
+
+	if get != nil {
+		jsFunc := createFunction(*get)
+		withData.Get = &jsFunc
+	}
+
+	if update != nil {
+		jsFunc := createFunction(*update)
+		withData.Update = &jsFunc
+	}
+
+	headTemplate, err := template.New("with").Parse(string(headBytes))
+	if err != nil {
+		log.Errorf("failed to write head with error %v", err)
+		return err
+	}
+
+	return headTemplate.Execute(wr, withData)
+}
+
+func (gen JsCodeGenerator) findFunction(name string, list []generator.FunctionData) *generator.FunctionData {
+	for _, item := range list {
+		if item.Name == name {
+			return &item
+		}
+	}
+
+	return nil
+}
+
+func (gen JsCodeGenerator) getAnnotation(name string, list []generator.Annotation) *string {
+	for _, item := range list {
+		if item.Name == name {
+			return &item.Value
+		}
+	}
+
+	return nil
+}
+
+func (gen JsCodeGenerator) getAnnotatedStructures(source *generator.CodeList) []generator.ExportedStucture {
+	list := make([]generator.ExportedStucture, 0, len(source.Structures))
+
+	for _, stucture := range source.Structures {
+		if len(stucture.Annotation) > 0 {
+			list = append(list, stucture)
+		}
+	}
+
+	return list
+}
+
+func (generator JsCodeGenerator) writeGeneral(source *generator.CodeList) error {
 	outFile := generator.packageName + ".js"
 	log.Printf("createing %s", outFile)
 
@@ -189,7 +335,7 @@ func writeStructure(wr io.Writer, structType generator.ExportedStucture) {
 
 func createFunction(function generator.FunctionData) Function {
 	return Function{
-		Name:         function.Name,
+		Name:         strcase.ToLowerCamel(function.Name),
 		Comments:     function.Comments,
 		ReturnType:   function.ReturnType,
 		Params:       createListOfFields(function.Params),

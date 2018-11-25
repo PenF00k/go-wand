@@ -178,6 +178,8 @@ function subribeApiCall(name: string, args :any[], callback: (json : String) => 
 async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise<any> {
    {{if .Dev}} 
    const {name, args, subsription} = subscription
+    return devCall.cancel(name, args)
+
    {{else}}
     const callData = JSON.stringify({
       args,
