@@ -31,8 +31,14 @@
    {{- else -}}  
       obj := {{ .RichType.SimpleType }}{}
 
+      {{if .RichType.Pointer }} 
+         err := mapstructure.Decode(arg, &obj)
+         return &obj, err   
+      {{ else }}
+
       err := mapstructure.Decode(arg, &obj)
       return obj, err   
+      {{ end }}
    {{- end -}}
 {{end -}}
 
