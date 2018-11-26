@@ -115,24 +115,24 @@ type WithHeader struct {
 }
 
 func (gen JsCodeGenerator) writeWithHeader(f io.Writer, sourceList *generator.CodeList) error {
-	headBytes, err := ioutil.ReadFile("./templates/headWith.js.tmpl") // just pass the file name
+	// headBytes, err := ioutil.ReadFile("./templates/headWith.js.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	file, err := assets.Assets.Open("/templates/headWith.js.tmpl")
+	defer file.Close()
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return err
 	}
 
-	// file, err := assets.Assets.Open("/templates/headWith.js.tmpl")
-	// defer file.Close()
-	// if err != nil {
-	// 	log.Errorf("read file error %v", err)
-	// 	return err
-	// }
-
-	// headBytes, err := ioutil.ReadAll(file)
-	// if err != nil {
-	// 	log.Errorf("read file error %v", err)
-	// 	return err
-	// }
+	headBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
 
 	header := WithHeader{
 		PackageName: gen.packageName,
