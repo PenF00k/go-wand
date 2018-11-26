@@ -1,0 +1,3 @@
+func {{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }} {{ $item.Type }}{{end}})  {
+   {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}})
+} 
