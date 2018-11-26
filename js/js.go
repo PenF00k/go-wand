@@ -156,24 +156,24 @@ func (gen JsCodeGenerator) writeWithHeader(f io.Writer, sourceList *generator.Co
 }
 
 func (gen JsCodeGenerator) writeWithFunction(wr io.Writer, get *generator.FunctionData, update *generator.FunctionData, strct generator.ExportedStucture) error {
-	headBytes, err := ioutil.ReadFile("./templates/with.js.tmpl") // just pass the file name
+	// headBytes, err := ioutil.ReadFile("./templates/with.js.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return err
+	// }
+
+	file, err := assets.Assets.Open("/templates/with.js.tmpl")
+	defer file.Close()
 	if err != nil {
 		log.Errorf("read file error %v", err)
 		return err
 	}
 
-	// file, err := assets.Assets.Open("/templates/head.js.tmpl")
-	// defer file.Close()
-	// if err != nil {
-	// 	log.Errorf("read file error %v", err)
-	// 	return err
-	// }
-
-	// headBytes, err := ioutil.ReadAll(file)
-	// if err != nil {
-	// 	log.Errorf("read file error %v", err)
-	// 	return err
-	// }
+	headBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return err
+	}
 
 	funcDecl := get
 	if get == nil {

@@ -102,7 +102,7 @@ func (reload *LiveReload) Run() error {
 				return err
 			}
 
-			if info.IsDir() {
+			if info.IsDir() && info.Name() != ".git" {
 				watcher.Add(path)
 			}
 
@@ -123,8 +123,6 @@ func (reload *LiveReload) Run() error {
 			if !ok {
 				return nil
 			}
-
-			log.Println("event:", event)
 
 			fi, err := os.Stat(event.Name)
 			if err == nil {
