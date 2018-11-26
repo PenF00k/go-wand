@@ -60,7 +60,7 @@ func StoreConfig() {
 
 	out, _ := yaml.Marshal(configuration)
 	// Use os.Create to create a file for writing.
-	f, err := os.Create("gocall.yaml")
+	f, err := os.Create("wand.yaml")
 	if err != nil {
 		log.Errorf("Failed to create gocall.yaml")
 		return
