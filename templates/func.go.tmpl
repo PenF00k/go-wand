@@ -141,7 +141,6 @@ func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.J
    {{ end }}
 
    {{range $index, $item := .Params}}
-
    {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(args[{{$index}}])
    if err != nil {
@@ -151,5 +150,4 @@ func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.J
    {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}, {{end}} callback)
    return nil
 }
-
 {{ end }}

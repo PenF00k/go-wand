@@ -52,7 +52,7 @@ func Parse(codeList *generator.CodeList) error {
 	oldState := *codeList
 	codeList.Functions = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	codeList.Structures = make([]generator.ExportedStucture, 0, len(codeList.Functions)+8)
-
+	codeList.Pure = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	packageName := "unknown"
 
 	for name, pkg := range pkgs {
@@ -105,7 +105,12 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 		return true
 	}
 
+	if len(newState.Pure) != len(oldState.Pure) {
+		return true
+	}
+
 	if reflect.DeepEqual(newState.Functions, oldState.Functions) &&
+		reflect.DeepEqual(newState.Pure, oldState.Pure) &&
 		reflect.DeepEqual(newState.Structures, oldState.Structures) {
 		return true
 	}
@@ -113,19 +118,30 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 	return false
 }
 
-func createFunctionParameters(funcDecl *ast.FuncDecl) generator.FunctionData {
+func createFunctionParameters(funcDecl *ast.FuncDecl) (*generator.FunctionData, *generator.FunctionData) {
 	comments := getComments(funcDecl.Doc)
 	comments, subscription := getSubriptionAnnotatedType(comments)
 	comments, returnType := getCallbackAnnotatedType(comments)
 
-	return generator.FunctionData{
+	if subscription == nil && returnType == "any" {
+		return nil, &generator.FunctionData{
+			Subscription: subscription,
+			Comments:     comments,
+			ReturnType:   returnType,
+			Name:         funcDecl.Name.Name,
+			Params:       funcDecl.Type.Params,
+			CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
+		}
+	}
+
+	return &generator.FunctionData{
 		Subscription: subscription,
 		Comments:     comments,
 		ReturnType:   returnType,
 		Name:         funcDecl.Name.Name,
 		Params:       funcDecl.Type.Params,
 		CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
-	}
+	}, nil
 }
 
 func getCallbackAnnotatedType(comments []string) ([]string, string) {
@@ -213,8 +229,12 @@ func createFuction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 		return
 	}
 
-	function := createFunctionParameters(funcDecl)
-	codeList.AddFunction(function)
+	function, pure := createFunctionParameters(funcDecl)
+	if function != nil {
+		codeList.AddFunction(*function)
+	} else {
+		codeList.AddPureFunction(*pure)
+	}
 }
 
 func createType(codeList *generator.CodeList, typeSpec *ast.TypeSpec) {

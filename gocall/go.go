@@ -116,13 +116,51 @@ func (generator GoCodeGenerator) writeCode(source *generator.CodeList) error {
 	writeHeader(f, source)
 	writeMap(f, source)
 	writeFunctions(f, generator.packageName, source)
-
+	writePureFunctions(f, generator.packageName, source)
 	return nil
 }
 
 func writeFunctions(wr io.Writer, pack string, source *generator.CodeList) {
 	for _, function := range source.Functions {
 		writeFunction(wr, pack, function)
+	}
+}
+
+func writePureFunctions(wr io.Writer, pack string, source *generator.CodeList) {
+	for _, function := range source.Pure {
+		writePureFunction(wr, pack, function)
+	}
+}
+
+func writePureFunction(wr io.Writer, pack string, function generator.FunctionData) {
+	// b, err := ioutil.ReadFile("func.go.tmpl") // just pass the file name
+	// if err != nil {
+	// 	log.Errorf("read file error %v", err)
+	// 	return
+	// }
+
+	file, err := assets.Assets.Open("/templates/pure.go.tmpl")
+	defer file.Close()
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return
+	}
+
+	b, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Errorf("read file error %v", err)
+		return
+	}
+
+	t, err := template.New("structType").Parse(string(b))
+	if err != nil {
+		log.Errorf("failed with error %v", err)
+		return
+	}
+
+	err = t.Execute(wr, createFunction(pack, function))
+	if err != nil {
+		log.Errorf("template failed with error %v", err)
 	}
 }
 

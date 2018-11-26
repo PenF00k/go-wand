@@ -42,6 +42,7 @@ type CodeList struct {
 	SourcePackage string
 	Structures    []ExportedStucture
 	Functions     []FunctionData
+	Pure          []FunctionData
 	Config        *config.Configuration
 	PathMap       PathMap
 }
@@ -52,6 +53,10 @@ func (list *CodeList) AddStructure(structure ExportedStucture) {
 
 func (list *CodeList) AddFunction(function FunctionData) {
 	list.Functions = append(list.Functions, function)
+}
+
+func (list *CodeList) AddPureFunction(function FunctionData) {
+	list.Pure = append(list.Pure, function)
 }
 
 type Generator interface {

@@ -27,12 +27,16 @@ func main() {
 			Value: "wand.yaml",
 			Usage: "configuration file",
 		},
+		cli.BoolFlag{
+			Name:  "release",
+			Usage: "contruct release",
+		},
 	}
 
 	app.Name = "wand"
 	app.Usage = "magic link beetween go and js"
 	app.Action = func(c *cli.Context) error {
-		runApplication(c.String("config"), true)
+		runApplication(c.String("config"), !c.Bool("release"))
 		return nil
 	}
 
@@ -98,7 +102,11 @@ func runApplication(configName string, dev bool) {
 		Config:        configuration,
 	}
 
-	watchGo(codeList)
+	if dev {
+		watchGo(codeList)
+	} else {
+		Parse(codeList)
+	}
 }
 
 func watchGo(codeList *generator.CodeList) {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"errors"
 	"strconv"
-	"net/http"
+	{{if .Dev }}"net/http"{{end}}
 	"gitlab.vmassive.ru/wand/goapi"
 	"{{ .SourcePackage }}"
 	{{if .Dev}}"gitlab.vmassive.ru/wand/goapi/remgo"{{end}}
