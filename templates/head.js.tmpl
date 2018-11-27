@@ -177,12 +177,14 @@ export function subribeApiCall(name: string, args :any[], callback: (json : Stri
    {{end}}
 }
 
-export async function cancelSubscriptionApiCall(subscription : GoSubscription) : Promise<any> {
+export async function cancelSubscriptionApiCall(subs : GoSubscription) : Promise<any> {
    {{if .Dev}} 
-   const {name, args, subscription} = subscription
+   const {name, args, subscription} = subs
     return devCall.cancel(name, args)
 
    {{else}}
+    const {name, args, subscription} = subs
+
     const callData = JSON.stringify({
       args,
       event: name,
