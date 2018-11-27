@@ -226,7 +226,7 @@ func (r *LiveReload) RunBuild() (*exec.Cmd, error) {
 	if r.command == nil || r.Exited() {
 		err := r.runBin()
 		if err != nil {
-			log.Print("Error running: ", err)
+			log.Errorf("Error running: %+v", err)
 		}
 		time.Sleep(250 * time.Millisecond)
 		return r.command, err

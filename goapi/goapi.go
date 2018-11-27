@@ -143,12 +143,21 @@ func (registry *JsRegistry) CancelSubscription(subscriptionData map[string]inter
 func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback JsCallback) {
 	methodName, ok := methodCallData["method"].(string)
 	if ok {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("[!!!] Method \"%s\" crashed", methodName)
+				log.Errorf("%v", r)
+
+				callback.OnError("call failed with crash")
+			}
+		}()
+
 		functionCall := registry.functions[methodName]
 		if functionCall != nil {
-			log.Printf(">>>>>>>>>>>>>>>>>>>> calling methodName %s", methodName)
+			log.Printf("[CALL] methodName %s", methodName)
 			functionCall(methodCallData, callback)
 		} else {
-			log.Printf(">>>>>>>>>>>>>>>>>>>> methodName not found %s", methodName)
+			log.Errorf("methodName not found %s", methodName)
 			callback.OnError("no such method: " + methodName)
 		}
 	}
