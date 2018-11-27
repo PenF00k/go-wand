@@ -97,7 +97,7 @@ class RemoveDev {
 
     this.requestId++
 
-    this.event[eventName] = (response: any) => {
+    this.event[name] = (response: any) => {
       if (response.Body) {
         callback(JSON.stringify(response.Body))
       }
@@ -110,7 +110,7 @@ class RemoveDev {
       this.pendingList = [...this.pendingList, body]
     }
 
-    return { name, eventName, devId: this.requestId }
+    return { name, name, devId: this.requestId }
   }
 
   subscribe = (name: string, args :any[], eventName: string, callback: (json : String) => void) : GoSubscriptions => {
