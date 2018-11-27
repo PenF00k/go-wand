@@ -1,8 +1,14 @@
+
 {{define "typeCast"}}
    {{if eq .Type "string" -}} 
       str, ok := arg.(string)
       if !ok {
-         return "", errors.New("wrong type, string is expected")
+         num, ok := arg.(float64) 
+         if ok {
+            return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
+         }
+
+         return "", errors.New("wrong type, string is expected ({{ .Name  }})")
       }
 
       return str, nil
@@ -28,21 +34,27 @@
       }
       return arg.(float32), nil
    {{- else -}}  
-      obj := {{ .Package  }}.{{ .RichType.SimpleType }}{}
+      obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
       err := mapstructure.Decode(arg, &obj)
 
       {{if .RichType.Pointer }} 
       return &obj, err   
-      {{ else }}            
+      {{ else }}
       return obj, err   
       {{ end }}
    {{- end -}}
 {{end -}}
+
 {{define "atomTypeCast"}}
             {{if eq .SimpleType "string"}}
                str, ok := arg.(string)
                if !ok {
-                  return "", errors.New("wrong type, string is expected")
+                  num, ok := arg.(float64) 
+                  if ok {
+                     return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
+                  }
+
+                  return "", errors.New("wrong type, string is expected for ({{ .Name  }})")
                }
 
                return str, nil
@@ -82,7 +94,14 @@
 
                return arg.(int), nil
             {{else}}
-             
+               obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
+               err := mapstructure.Decode(arg, &obj)
+
+               {{if .RichType.Pointer }} 
+               return &obj, err   
+               {{ else }}
+               return obj, err   
+               {{ end }}
 
             {{end}}
 {{end}}
@@ -124,10 +143,7 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
    {{ end -}}
 
    {{ range $index, $item := .Params }}
-   {{ $item.Name }}, err := func(arg interface{}) (
-   {{- if $item.RichType.Object -}}
-      {{ $item.Package }}.
-   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return nil, err
@@ -142,10 +158,7 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
 func subscriptionTypes{{ .Name }}(________args []interface{}) ([]interface{}, error) {
    result := make([]interface{}, 0, len(________args))
    {{ range $index, $item := .Params -}}
-   {{ $item.Name }}, err := func(arg interface{}) (
-    {{- if $item.RichType.Object -}}
-      {{ $item.Package }}.
-   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return nil, err
@@ -165,10 +178,7 @@ func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.J
    }
    {{ end }}
    {{ range $index, $item := .Params}}
-   {{ $item.Name }}, err := func(arg interface{}) (
-   {{- if $item.RichType.Object -}}
-      {{ $item.Package }}.
-   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) ({{if $item.RichType.Object }}{{ $item.Package}}.{{end}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return err

@@ -187,7 +187,7 @@ func writeFunction(wr io.Writer, pack string, function generator.FunctionData) {
 		return
 	}
 
-	t, err := template.New("structType").Parse(string(b))
+	t, err := template.New("function").Parse(string(b))
 	if err != nil {
 		log.Errorf("failed with error %v", err)
 		return

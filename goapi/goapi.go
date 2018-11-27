@@ -155,7 +155,10 @@ func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback
 		functionCall := registry.functions[methodName]
 		if functionCall != nil {
 			log.Printf("[CALL] methodName %s", methodName)
-			functionCall(methodCallData, callback)
+			err := functionCall(methodCallData, callback)
+			if err != nil {
+				callback.OnError(err.Error())
+			}
 		} else {
 			log.Errorf("methodName not found %s", methodName)
 			callback.OnError("no such method: " + methodName)
