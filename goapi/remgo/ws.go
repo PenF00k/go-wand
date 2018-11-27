@@ -130,7 +130,7 @@ type callMeOnResult struct {
 }
 
 func (call callMeOnResult) OnSuccess(data interface{}) {
-	log.Errorf("[SUCCESS] %+#v", data)
+	log.Printf("[SUCCESS] %+#v", data)
 
 	respBody := ResponseBody{Success: data, ID: call.ID}
 
