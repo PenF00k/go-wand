@@ -154,7 +154,7 @@ function getName(name: string, args :any[]) : string {
    return `${name}:${body}`
 }
 
-function subribeApiCall(name: string, args :any[], callback: (json : String) => void) : GoSubscription {
+export function subribeApiCall(name: string, args :any[], callback: (json : String) => void) : GoSubscription {
    {{if .Dev}}
    const subscriptionName = getName(name, args)
    return devCall.subscribe(name, args, subscriptionName, callback)
@@ -177,7 +177,7 @@ function subribeApiCall(name: string, args :any[], callback: (json : String) => 
    {{end}}
 }
 
-async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise<any> {
+export async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise<any> {
    {{if .Dev}} 
    const {name, args, subsription} = subscription
     return devCall.cancel(name, args)
@@ -194,7 +194,7 @@ async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise
    {{end}}
 }
 
-async function runApiCall(name: string, args :any[]) : Promise<any> {
+export async function runApiCall(name: string, args :any[]) : Promise<any> {
    {{if .Dev}} 
     return devCall.callMethod(name, args)
    {{else}}
