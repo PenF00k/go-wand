@@ -1,4 +1,3 @@
-
 {{define "typeCast"}}
    {{if eq .Type "string" -}} 
       str, ok := arg.(string)
@@ -29,19 +28,16 @@
       }
       return arg.(float32), nil
    {{- else -}}  
-      obj := {{ .RichType.SimpleType }}{}
+      obj := {{ .Package  }}.{{ .RichType.SimpleType }}{}
+      err := mapstructure.Decode(arg, &obj)
 
       {{if .RichType.Pointer }} 
-         err := mapstructure.Decode(arg, &obj)
-         return &obj, err   
-      {{ else }}
-
-      err := mapstructure.Decode(arg, &obj)
+      return &obj, err   
+      {{ else }}            
       return obj, err   
       {{ end }}
    {{- end -}}
 {{end -}}
-
 {{define "atomTypeCast"}}
             {{if eq .SimpleType "string"}}
                str, ok := arg.(string)
@@ -128,7 +124,10 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
    {{ end -}}
 
    {{ range $index, $item := .Params }}
-   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) (
+   {{- if $item.RichType.Object -}}
+      {{ $item.Package }}.
+   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return nil, err
@@ -143,7 +142,10 @@ func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCa
 func subscriptionTypes{{ .Name }}(________args []interface{}) ([]interface{}, error) {
    result := make([]interface{}, 0, len(________args))
    {{ range $index, $item := .Params -}}
-   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) (
+    {{- if $item.RichType.Object -}}
+      {{ $item.Package }}.
+   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return nil, err
@@ -163,7 +165,10 @@ func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.J
    }
    {{ end }}
    {{ range $index, $item := .Params}}
-   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
+   {{ $item.Name }}, err := func(arg interface{}) (
+   {{- if $item.RichType.Object -}}
+      {{ $item.Package }}.
+   {{- end -}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
    }(________args[{{$index}}])
    if err != nil {
       return err

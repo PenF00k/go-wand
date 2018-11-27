@@ -7,12 +7,25 @@ import (
 	"strconv"
 	{{if .Dev }}"net/http"{{end}}
 	"gitlab.vmassive.ru/wand/goapi"
+	"github.com/mitchellh/mapstructure"
 	"{{ .SourcePackage }}"
 	{{if .Dev}}"gitlab.vmassive.ru/wand/goapi/remgo"{{end}}
 )
 
 // Registry for all calls
 var registry goapi.JsRegistry = goapi.NewJsRegistry()
+
+
+type X_____xxxx struct { Val string }
+func Ping____(number int) string {
+	return strconv.Itoa(number)
+}
+
+func Ping____XXX(val interface{}) string {
+	data := X_____xxxx{}
+	mapstructure.Decode(val, &val)
+	return data.Val
+}
 
 {{if .Dev }}
 func serveHome(w http.ResponseWriter, r *http.Request) {

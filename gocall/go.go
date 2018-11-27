@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"unicode"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.vmassive.ru/wand/assets"
@@ -31,6 +32,7 @@ type Type struct {
 	SimpleType string
 	Pointer    bool
 	InnerType  *Type
+	Object     bool
 }
 
 type Field struct {
@@ -40,6 +42,7 @@ type Field struct {
 	RichType   Type
 	Array      bool
 	SimpleType string
+	Package    string
 }
 
 type GoCodeGenerator struct {
@@ -201,7 +204,7 @@ func createFunction(pack string, function generator.FunctionData) Function {
 		Name:         function.Name,
 		Comments:     function.Comments,
 		ReturnType:   function.ReturnType,
-		Params:       createListOfFields(function.Params),
+		Params:       createListOfFields(function.Params, pack),
 		Subscription: function.Subscription,
 		Package:      pack,
 	}
@@ -236,7 +239,7 @@ func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
 	return headTemplate.Execute(f, sourceList)
 }
 
-func createListOfFields(list *ast.FieldList) []Field {
+func createListOfFields(list *ast.FieldList, pack string) []Field {
 	fields := make([]Field, 0, 100)
 	for _, field := range list.List {
 
@@ -258,6 +261,7 @@ func createListOfFields(list *ast.FieldList) []Field {
 				Type:     typeName,
 				Comment:  getComments(field.Doc),
 				RichType: richType,
+				Package:  pack,
 			}
 
 			fields = append(fields, fieldInfo)
@@ -278,11 +282,16 @@ func getComments(commGroup *ast.CommentGroup) []string {
 	return comments
 }
 
+func isObject(name string) bool {
+	return unicode.IsUpper([]rune(name)[0])
+}
+
 func createRichType(tp ast.Expr) Type {
 	Map := false
 	Array := false
 	SimpleType := "interface{}"
 	Pointer := false
+
 	var InnerType *Type
 
 	switch x := tp.(type) {
@@ -305,12 +314,15 @@ func createRichType(tp ast.Expr) Type {
 		Array = true
 	}
 
+	object := isObject(SimpleType)
+
 	return Type{
 		SimpleType: SimpleType,
 		Array:      Array,
 		Map:        Map,
 		Pointer:    Pointer,
 		InnerType:  InnerType,
+		Object:     object,
 	}
 }
 
