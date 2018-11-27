@@ -71,7 +71,7 @@ class RemoveDev {
       const requestID = this.requestId++
 
       this.call[requestID] = (response: any) => {
-        if (response.Success) {
+        if (response.Success !== undefined && response.Success !== null) {
           resolve(JSON.stringify(response.Success))
         } else {
           reject(JSON.stringify(response.Error))
