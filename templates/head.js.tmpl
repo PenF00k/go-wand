@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 type GoSubscription = {
-   subsription: EmitterSubscription,
+   subscription: EmitterSubscription,
    name: string,
    args: any[],
    devId: number,
@@ -160,7 +160,7 @@ export function subribeApiCall(name: string, args :any[], callback: (json : Stri
    return devCall.subscribe(name, args, subscriptionName, callback)
    {{else}}
    const subscriptionName = getName(name, args)
-   subsription = DeviceEventEmitter.addListener(subscriptionName, callback);
+   subscription = DeviceEventEmitter.addListener(subscriptionName, callback);
 
    const callData = JSON.stringify({
       args,
@@ -172,14 +172,14 @@ export function subribeApiCall(name: string, args :any[], callback: (json : Stri
    return {
       args,
       name,
-      subsription,
+      subscription,
    }
    {{end}}
 }
 
-export async function cancelSubsriptionApiCall(subscription : GoSubscription) : Promise<any> {
+export async function cancelSubscriptionApiCall(subscription : GoSubscription) : Promise<any> {
    {{if .Dev}} 
-   const {name, args, subsription} = subscription
+   const {name, args, subscription} = subscription
     return devCall.cancel(name, args)
 
    {{else}}
@@ -188,7 +188,7 @@ export async function cancelSubsriptionApiCall(subscription : GoSubscription) : 
       event: name,
     })
 
-    subsription.remove()
+    subscription.remove()
 
     return NativeModules.GoCall.cancel(callData)
    {{end}}

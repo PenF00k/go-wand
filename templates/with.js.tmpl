@@ -35,7 +35,7 @@ export function with{{ .Name }}<Props: {} & {{ .Name }}Prop>(
     }
 
     componentWillUnmount() {
-     {{ if .Update }}cancelSubsriptionApiCall(this.subscription)
+     {{ if .Update }}cancelSubscriptionApiCall(this.subscription)
      {{ end }}
     }
 

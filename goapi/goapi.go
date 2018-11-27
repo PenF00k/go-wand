@@ -27,7 +27,7 @@ type Subscription interface {
 	Cancel()
 }
 
-func BuildSubsriptionName(funcName string, params []interface{}) string {
+func BuildSubscriptionName(funcName string, params []interface{}) string {
 	list := make([]string, 0, len(params))
 	for _, param := range params {
 		switch x := param.(type) {
@@ -105,7 +105,7 @@ func (registry *JsRegistry) Subscribe(subscriptionData map[string]interface{}) {
 			if ok {
 				typedArgs, err := adapter.subscriptionTypesFunc(args)
 				if err == nil {
-					eventName = BuildSubsriptionName(eventName, typedArgs)
+					eventName = BuildSubscriptionName(eventName, typedArgs)
 					registry.subscriptionRegistry.RegisterSubscription(eventName, subscriptionData, adapter.subscriptionFunc)
 				}
 			} else {
@@ -126,7 +126,7 @@ func (registry *JsRegistry) CancelSubscription(subscriptionData map[string]inter
 			if ok {
 				typedArgs, err := adapter.subscriptionTypesFunc(args)
 				if err == nil {
-					eventName = BuildSubsriptionName(eventName, typedArgs)
+					eventName = BuildSubscriptionName(eventName, typedArgs)
 					registry.subscriptionRegistry.CancelSubscription(eventName)
 				}
 			} else {
@@ -225,15 +225,15 @@ func (registry *SubscriptionRegistry) CancelSubscription(eventName string) {
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subsription := registry.active[eventName]
-	if subsription != nil {
-		subsription.counter--
-		if subsription.counter == 0 {
+	subscription := registry.active[eventName]
+	if subscription != nil {
+		subscription.counter--
+		if subscription.counter == 0 {
 			registry.active[eventName] = nil
-			subsription.subscription.Cancel()
+			subscription.subscription.Cancel()
 		}
 	} else {
-		log.Errorf("Subsription already cancelled")
+		log.Errorf("Subscription already cancelled")
 	}
 }
 
@@ -242,22 +242,22 @@ func (registry *SubscriptionRegistry) RegisterSubscription(eventName string, par
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subsription := registry.active[eventName]
-	if subsription == nil {
+	subscription := registry.active[eventName]
+	if subscription == nil {
 		event := NewNamedEvent(eventName, &registry.callback)
 		sub, err := newCall(params, event)
 		if err != nil {
 			return err
 		}
 
-		subsription = &subscriptionData{
+		subscription = &subscriptionData{
 			subscription: sub,
 		}
 
-		registry.active[eventName] = subsription
+		registry.active[eventName] = subscription
 	}
 
-	subsription.counter++
+	subscription.counter++
 
 	return nil
 }

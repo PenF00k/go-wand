@@ -161,7 +161,7 @@ func getCallbackAnnotatedType(comments []string) ([]string, string) {
 }
 
 var annotationList = []string{
-	"subsription",
+	"subscription",
 	"get",
 	"update",
 	"callback",
@@ -214,8 +214,8 @@ func getSubriptionAnnotatedType(comments []string) ([]string, *string) {
 
 	lastString := comments[len(comments)-1]
 
-	if strings.HasPrefix(lastString, "@subsription:") {
-		callbackType := strings.TrimPrefix(lastString, "@subsription:")
+	if strings.HasPrefix(lastString, "@subscription:") {
+		callbackType := strings.TrimPrefix(lastString, "@subscription:")
 		otherComments := comments[0 : len(comments)-1]
 		subName := strings.TrimSpace(callbackType)
 		return otherComments, &subName
