@@ -159,7 +159,6 @@ type JsEventCall struct {
 }
 
 func (jsEvent *JsEventCall) SetCallback(callback JsEvent) {
-	log.Printf("JsEventCall has new callback")
 	jsEvent.callback = callback
 }
 
