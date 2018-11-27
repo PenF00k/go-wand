@@ -74,6 +74,8 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) OnEvent(eventName string, body interface{}) {
+	log.Printf("[EVENT] %+#v", body)
+
 	event := EventBody{EventName: eventName, Body: body}
 	resp, _ := json.Marshal(event)
 	h.broadcast <- resp
@@ -128,6 +130,8 @@ type callMeOnResult struct {
 }
 
 func (call callMeOnResult) OnSuccess(data interface{}) {
+	log.Errorf("[SUCCESS] %+#v", data)
+
 	respBody := ResponseBody{Success: data, ID: call.ID}
 
 	resp, _ := json.Marshal(respBody)
@@ -135,6 +139,8 @@ func (call callMeOnResult) OnSuccess(data interface{}) {
 }
 
 func (call callMeOnResult) OnError(data interface{}) {
+	log.Errorf("[ERROR] %+#v", data)
+
 	respBody := ResponseBody{Error: data}
 
 	resp, _ := json.Marshal(respBody)
