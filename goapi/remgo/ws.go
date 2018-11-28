@@ -155,7 +155,7 @@ func (call callMeOnResult) OnSuccess(data interface{}) {
 func (call callMeOnResult) OnError(data interface{}) {
 	log.Errorf("[ERROR] %+#v", data)
 
-	respBody := ResponseBody{Error: data}
+	respBody := ResponseBody{Error: data, ID: call.ID}
 
 	resp, _ := json.Marshal(respBody)
 	call.response <- resp
