@@ -3,6 +3,7 @@ package remgo
 import (
 	"encoding/json"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -17,6 +18,10 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+}
+
+func init() {
+	debug.SetPanicOnFault(true)
 }
 
 var (
@@ -125,8 +130,17 @@ type EventBody struct {
 }
 
 type callMeOnResult struct {
+	Time     time.Time
 	ID       int
 	response chan []byte
+}
+
+func newRequestHanler(id int, response chan []byte) *callMeOnResult {
+	return &callMeOnResult{
+		Time:     time.Now(),
+		ID:       id,
+		response: response,
+	}
 }
 
 func (call callMeOnResult) OnSuccess(data interface{}) {
@@ -174,7 +188,7 @@ func (c *Client) readPump() {
 		if request.Call != nil {
 			log.Printf("calling method %#+v", request)
 
-			callback := &callMeOnResult{response: c.send, ID: request.ID}
+			callback := newRequestHanler(request.ID, c.send)
 			c.registry.Call(request.Call, callback)
 		} else if request.Subscribe != nil {
 			log.Printf("subscribing %#+v", request)
