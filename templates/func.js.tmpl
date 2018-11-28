@@ -8,7 +8,7 @@ export async function {{ .Name }}({{range $index, $item := .Params}}{{ $item.Nam
    try {
       await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}], (json: string) => { callback(JSON.parse(json)) })
    } catch(error) {
-      console.error("Call of {{ .Name }} failed", error)
+      console.warn("Call of {{ .Name }} failed", error)
    }
 
    return subscription
@@ -22,7 +22,7 @@ export async function {{ .Name }}({{range $index, $item := .Params}}{{if $index}
         const jsonString = await runApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}])
         return JSON.parse(jsonString)
    } catch(error) {
-        console.error("Call of {{ .Name }} failed", error)
+        console.warn("Call of {{ .Name }} failed", error)
         throw error
    }
 }
