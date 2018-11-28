@@ -10,6 +10,21 @@ import {
   NativeModules,
 } from 'react-native';
 
+export function RenderWhenReady(fields) {
+  return function(target) {
+    return branch(
+      (props) => {
+        if (Array.isArray(fields)) {
+          return !fields.reduce((acc, val) => acc && (props[val] !== undefined), true)
+        }
+
+        return props[fields] !== undefined
+      },
+      renderNothing,
+    )(target)
+  }
+}
+
 import {
   cancelSubscriptionApiCall,
 {{range $_, $item := .Functions}}
