@@ -1,6 +1,10 @@
 
 {{define "typeCast"}}
    {{if eq .Type "string" -}} 
+      if arg == nil {
+         return "", errors.New("wrong type") 
+      }  
+         
       str, ok := arg.(string)
       if !ok {
          num, ok := arg.(float64) 
@@ -13,6 +17,10 @@
 
       return str, nil
    {{- else if eq .Type "int" -}} 
+      if arg == nil {
+         return 0, errors.New("wrong type") 
+      }
+            
       str, ok := arg.(string) 
       if ok {
          return strconv.Atoi(str)
@@ -59,6 +67,10 @@
 
                return str, nil
             {{else if eq .SimpleType "int"}} 
+               if arg == nil {
+                  return 0, errors.New("wrong type") 
+               }
+
                str, ok := arg.(string) 
                if ok {
                   return strconv.Atoi(str)
@@ -71,6 +83,10 @@
 
                return arg.(int), nil
             {{else if eq .SimpleType "float32"}} 
+               if arg == nil {
+                  return 0, errors.New("wrong type") 
+               }
+
                str, ok := arg.(string) 
                if ok {
                   fl, err := strconv.ParseFloat(float32) 
@@ -81,6 +97,10 @@
                }
                return arg.(float32), nil
             {{else if eq .SimpleType "int32"}} 
+               if arg == nil {
+                  return 0, errors.New("wrong type") 
+               }
+
                str, ok := arg.(string) 
                if ok {
                   val, err := strconv.Atoi(str)                  
