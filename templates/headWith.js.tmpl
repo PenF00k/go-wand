@@ -23,7 +23,7 @@ export function RenderWhenReady(fields) {
           return !fields.reduce((acc, val) => acc && (props[val] !== undefined), true)
         }
 
-        return props[fields] !== undefined
+        return props[fields] === undefined
       },
       renderNothing,
     )(target)
