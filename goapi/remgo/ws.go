@@ -2,6 +2,8 @@ package remgo
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -18,10 +20,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
-}
-
-func init() {
-	debug.SetPanicOnFault(true)
 }
 
 var (
@@ -124,29 +122,58 @@ type ResponseBody struct {
 	Error   interface{}
 }
 
+type StatBody struct {
+	Name     string
+	Request  interface{}
+	Response ResponseBody
+	Time     time.Duration
+}
+
 type EventBody struct {
 	EventName string
 	Body      interface{}
 }
 
 type callMeOnResult struct {
-	Time     time.Time
-	ID       int
-	response chan []byte
+	Time      time.Time
+	ID        int
+	request   interface{}
+	response  chan []byte
+	broadcast chan []byte
 }
 
-func newRequestHanler(id int, response chan []byte) *callMeOnResult {
+func newRequestHanler(id int, request interface{}, response chan []byte, broadcast chan []byte) *callMeOnResult {
 	return &callMeOnResult{
-		Time:     time.Now(),
-		ID:       id,
-		response: response,
+		Time:      time.Now(),
+		ID:        id,
+		request:   request,
+		response:  response,
+		broadcast: broadcast,
 	}
+}
+
+func (call callMeOnResult) SendStat(data ResponseBody) {
+	r := new(big.Int)
+	fmt.Println(r.Binomial(1000, 10))
+
+	elapsed := time.Since(call.Time)
+
+	statBody := StatBody{
+		Name:     "call",
+		Request:  call.request,
+		Time:     elapsed,
+		Response: data,
+	}
+
+	resp, _ := json.Marshal(statBody)
+	call.broadcast <- resp
 }
 
 func (call callMeOnResult) OnSuccess(data interface{}) {
 	log.Printf("[SUCCESS] %+#v", data)
 
 	respBody := ResponseBody{Success: data, ID: call.ID}
+	call.SendStat(respBody)
 
 	resp, _ := json.Marshal(respBody)
 	call.response <- resp
@@ -156,6 +183,7 @@ func (call callMeOnResult) OnError(data interface{}) {
 	log.Errorf("[ERROR] %+#v", data)
 
 	respBody := ResponseBody{Error: data, ID: call.ID}
+	call.SendStat(respBody)
 
 	resp, _ := json.Marshal(respBody)
 	call.response <- resp
@@ -175,6 +203,8 @@ func (c *Client) readPump() {
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
+		debug.SetPanicOnFault(true)
+
 		request := CallRequest{}
 		err := c.conn.ReadJSON(&request)
 		if err != nil {
@@ -188,7 +218,7 @@ func (c *Client) readPump() {
 		if request.Call != nil {
 			log.Printf("calling method %#+v", request)
 
-			callback := newRequestHanler(request.ID, c.send)
+			callback := newRequestHanler(request.ID, request, c.send, c.hub.broadcast)
 			c.registry.Call(request.Call, callback)
 		} else if request.Subscribe != nil {
 			log.Printf("subscribing %#+v", request)
