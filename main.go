@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/build"
+	"net/http"
 	"os"
 	"os/signal"
 	"path"
@@ -10,6 +11,7 @@ import (
 	"gitlab.vmassive.ru/wand/config"
 	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/reload"
+	"gitlab.vmassive.ru/wand/web"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -126,6 +128,7 @@ func watchGo(codeList *generator.CodeList) {
 	shutdown(rel)
 
 	go rel.Run()
+	go webFace()
 
 	done := make(chan bool)
 	go func() {
@@ -169,6 +172,12 @@ func createDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, os.ModePerm)
 	}
+}
+
+func webFace() {
+	fs := http.FileServer(web.Assets)
+	http.Handle("/", http.StripPrefix("", fs))
+	http.ListenAndServe(":9000", nil)
 }
 
 func shutdown(runner *reload.LiveReload) {
