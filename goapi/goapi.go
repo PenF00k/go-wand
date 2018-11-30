@@ -1,6 +1,8 @@
 package goapi
 
 import (
+	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,9 +148,13 @@ func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback
 		defer func() {
 			if r := recover(); r != nil {
 				log.Errorf("[!!!] Method \"%s\" crashed", methodName)
-				log.Errorf("%v", r)
+				fmt.Printf("%v", r)
 
-				callback.OnError("call failed with crash")
+				stack := debug.Stack()
+
+				stackLines := strings.Split(string(stack), "\n")
+
+				callback.OnError(stackLines)
 			}
 		}()
 
