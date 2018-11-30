@@ -225,7 +225,7 @@ func (c *Client) readPump() {
 
 			c.registry.Subscribe(request.Subscribe)
 		} else if request.Cancel != nil {
-			log.Printf("cancelling method %#+v", request)
+			log.Errorf("cancelling method %#+v", request)
 
 			c.registry.CancelSubscription(request.Cancel)
 		} else {
