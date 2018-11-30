@@ -2,16 +2,14 @@
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
-export async function {{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}: {{ $item.Type }},{{end}}callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
-   subscription = DeviceEventEmitter.addListener('StageSubscription:', callback);
-
+export function {{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}: {{ $item.Type }},{{end}}callback: (e: {{ .Subscription }}) => void ) : GoSubscription {
    try {
-      await subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}], (json: string) => { callback(JSON.parse(json)) })
+      return subribeApiCall('{{ .Name }}', [{{range $index, $item := .Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}}], (json: string) => { callback(JSON.parse(json)) })
    } catch(error) {
       console.warn("Call of {{ .Name }} failed", error)
    }
 
-   return subscription
+   return undefined
 }
 {{ else }}
 /**{{range $_, $item := .Comments}}
