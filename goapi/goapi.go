@@ -151,7 +151,7 @@ func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback
 
 				stack := debug.Stack()
 
-				stackLines := strings.Split(string(stack)g, "\n")
+				stackLines := strings.Split(string(stack), "\n")
 
 				callback.OnError(stackLines)
 			}
