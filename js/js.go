@@ -443,6 +443,8 @@ func toJsName(name string) string {
 		fallthrough
 	case "int32":
 		return "number"
+	case "bool":
+		return "boolean"
 	}
 
 	return name
