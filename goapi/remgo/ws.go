@@ -2,8 +2,6 @@ package remgo
 
 import (
 	"encoding/json"
-	"fmt"
-	"math/big"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -153,9 +151,6 @@ func newRequestHanler(id int, request interface{}, response chan []byte, broadca
 }
 
 func (call callMeOnResult) SendStat(data ResponseBody) {
-	r := new(big.Int)
-	fmt.Println(r.Binomial(1000, 10))
-
 	elapsed := time.Since(call.Time)
 
 	statBody := StatBody{
@@ -225,8 +220,6 @@ func (c *Client) readPump() {
 
 			c.registry.Subscribe(request.Subscribe)
 		} else if request.Cancel != nil {
-			log.Errorf("cancelling method %#+v", request)
-
 			c.registry.CancelSubscription(request.Cancel)
 		} else {
 			log.Errorf("Unknown request %+v", request)

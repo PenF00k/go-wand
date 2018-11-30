@@ -2,7 +2,6 @@ package config
 
 import (
 	"bufio"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -34,14 +33,11 @@ type Configuration struct {
 func requestString(name string) string {
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print(name)
 		// Scans a line from Stdin(Console)
 		scanner.Scan()
 		// Holds the string that scanned
 		text := scanner.Text()
 		if len(text) != 0 {
-			fmt.Println(text)
-
 			clean := strings.Trim(text, " \t,.")
 			if clean != "" {
 				return clean
