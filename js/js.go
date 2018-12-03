@@ -386,7 +386,7 @@ func createFunction(function generator.FunctionData) Function {
 	return Function{
 		Name:         strcase.ToLowerCamel(function.Name),
 		Comments:     function.Comments,
-		ReturnType:   function.ReturnType,
+		ReturnType:   toJsName(function.ReturnType),
 		Params:       createListOfFields(function.Params),
 		Subscription: function.Subscription,
 	}
@@ -443,6 +443,8 @@ func toJsName(name string) string {
 		fallthrough
 	case "int32":
 		return "number"
+	case "bool":
+		return "boolean"
 	}
 
 	return name
