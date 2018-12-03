@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
+
+	"github.com/satori/go.uuid"
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
@@ -65,19 +68,112 @@ type Hub struct {
 	unregister chan *Client
 }
 
+/**
+type Hook interface {
+	Levels() []Level
+	Fire(*Entry) error
+}
+*/
+
 func NewHub() *Hub {
-	return &Hub{
+	hub := &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
 	}
+
+	log.AddHook(hub)
+
+	return hub
+}
+
+func (h *Hub) Levels() []log.Level {
+	return log.AllLevels
+}
+
+type LogData struct {
+	ID string
+	// Contains all the fields set by the user.
+	Data log.Fields
+
+	// Time at which the log entry was created
+	Time time.Time
+
+	// Level the log entry was logged at: Trace, Debug, Info, Warn, Error, Fatal or Panic
+	// This field will be set on entry firing and the value will be equal to the one in Logger struct field.
+	Level string
+
+	// Message passed to Trace, Debug, Info, Warn, Error, Fatal or Panic
+	Message string
+
+	Stack []string
+}
+
+type LogEvent struct {
+	Log LogData
+}
+
+func (h *Hub) Fire(entry *log.Entry) error {
+	/*
+
+		type Entry struct {
+		Logger *Logger
+
+		// Contains all the fields set by the user.
+		Data Fields
+
+		// Time at which the log entry was created
+		Time time.Time
+
+		// Level the log entry was logged at: Trace, Debug, Info, Warn, Error, Fatal or Panic
+		// This field will be set on entry firing and the value will be equal to the one in Logger struct field.
+		Level Level
+
+		// Calling method, with package name
+		Caller *runtime.Frame
+
+		// Message passed to Trace, Debug, Info, Warn, Error, Fatal or Panic
+		Message string
+
+		// When formatter is called in entry.log(), a Buffer may be set to entry
+		Buffer *bytes.Buffer
+
+		// err may contain a field formatting error
+		err string
+		}
+	*/
+
+	event := LogEvent{}
+	event.Log.Data = entry.Data
+	event.Log.Message = entry.Message
+	event.Log.Level = log.Level.String(entry.Level)
+	event.Log.Time = entry.Time
+
+	uuid, _ := uuid.NewV4()
+	event.Log.ID = uuid.String()
+
+	stack := debug.Stack()
+	event.Log.Stack = strings.Split(string(stack), "\n")
+	// entry.Caller
+
+	go h.SendEvent(event)
+
+	return nil
+}
+
+func (h *Hub) SendEvent(event LogEvent) {
+	resp, _ := json.Marshal(event)
+	h.broadcast <- resp
 }
 
 func (h *Hub) OnEvent(eventName string, body interface{}) {
 	log.Printf("[EVENT] %+#v", body)
 
-	event := EventBody{EventName: eventName, Body: body}
+	uuid, _ := uuid.NewV4()
+	id := uuid.String()
+
+	event := EventBody{EventName: eventName, Body: body, ID: id}
 	resp, _ := json.Marshal(event)
 	h.broadcast <- resp
 }
@@ -121,6 +217,7 @@ type ResponseBody struct {
 }
 
 type StatBody struct {
+	ID       string
 	Name     string
 	Request  interface{}
 	Response ResponseBody
@@ -128,6 +225,7 @@ type StatBody struct {
 }
 
 type EventBody struct {
+	ID        string
 	EventName string
 	Body      interface{}
 }
@@ -153,7 +251,9 @@ func newRequestHanler(id int, request interface{}, response chan []byte, broadca
 func (call callMeOnResult) SendStat(data ResponseBody) {
 	elapsed := time.Since(call.Time)
 
+	uuid, _ := uuid.NewV4()
 	statBody := StatBody{
+		ID:       uuid.String(),
 		Name:     "call",
 		Request:  call.request,
 		Time:     elapsed,
@@ -165,8 +265,6 @@ func (call callMeOnResult) SendStat(data ResponseBody) {
 }
 
 func (call callMeOnResult) OnSuccess(data interface{}) {
-	log.Printf("[SUCCESS] %+#v", data)
-
 	respBody := ResponseBody{Success: data, ID: call.ID}
 	call.SendStat(respBody)
 
@@ -175,8 +273,6 @@ func (call callMeOnResult) OnSuccess(data interface{}) {
 }
 
 func (call callMeOnResult) OnError(data interface{}) {
-	log.Errorf("[ERROR] %+#v", data)
-
 	respBody := ResponseBody{Error: data, ID: call.ID}
 	call.SendStat(respBody)
 
@@ -204,20 +300,13 @@ func (c *Client) readPump() {
 		err := c.conn.ReadJSON(&request)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
 			}
 			break
 		}
-		log.Printf("message %#+v", request)
-
 		if request.Call != nil {
-			log.Printf("calling method %#+v", request)
-
 			callback := newRequestHanler(request.ID, request, c.send, c.hub.broadcast)
 			c.registry.Call(request.Call, callback)
 		} else if request.Subscribe != nil {
-			log.Printf("subscribing %#+v", request)
-
 			c.registry.Subscribe(request.Subscribe)
 		} else if request.Cancel != nil {
 			c.registry.CancelSubscription(request.Cancel)
