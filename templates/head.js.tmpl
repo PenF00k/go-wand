@@ -51,10 +51,18 @@ class RemoveDev {
         this.call[response.ID](response)
       } else  if (response.EventName) {
         if (this.event[response.EventName]) {
-          this.event[response.EventName](response)
+          this.notify(this.event[response.EventName], response)
         }
       }
     })
+  }
+
+  notify(subscribers, response) {
+      const keys = Object.keys(subscribers)
+      keys.forEach(key => {
+         subscribers[key](response)
+      })
+
   }
 
   sendPending = () => {
@@ -89,19 +97,13 @@ class RemoveDev {
     })
   }
 
-  cancel = (name: string, args :any[]) : GoSubscriptions => {
+  cancel = (name: string, args :any[], eventName, requestId) : GoSubscriptions => {
     const callData = {
       args,
       event: name,
     }
 
-    this.requestId++
-
-    this.event[name] = (response: any) => {
-      if (response.Body) {
-        callback(JSON.stringify(response.Body))
-      }
-    }
+    delete this.event[eventName][requestId]
 
     const body = JSON.stringify({id: this.requestId, cancel: callData })
     try  {
@@ -119,22 +121,26 @@ class RemoveDev {
       event: name,
     }
 
-    this.requestId++
+    const requestID = this.requestId++
 
-    this.event[eventName] = (response: any) => {
+    if (!this.event[eventName]) {
+      this.event[eventName] = {}
+    }
+
+    this.event[eventName][requestID] = (response: any) => {
       if (response.Body) {
         callback(JSON.stringify(response.Body))
       }
     }
 
-    const body = JSON.stringify({id: this.requestId, subscribe: callData })
+    const body = JSON.stringify({id: requestID, subscribe: callData })
     try  {
       this.ws.send(body)
     } catch (err) {
       this.pendingList = [...this.pendingList, body]
     }
 
-    return { args, name, eventName, devId: this.requestId }
+    return { args, name, eventName, devId: requestID }
   }
 }
 
@@ -178,22 +184,22 @@ export function subribeApiCall(name: string, args :any[], callback: (json : Stri
 }
 
 export async function cancelSubscriptionApiCall(subs : GoSubscription) : Promise<any> {
-   {{if .Dev}} 
-   const {name, args, subscription} = subs
-    return devCall.cancel(name, args)
+  {{if .Dev}} 
+  const {name, args, requestId, eventName, subscription} = subs
+  return devCall.cancel(name, args, eventName, requestId)
 
-   {{else}}
-    const {name, args, subscription} = subs
+  {{else}}
+  const {name, args, subscription} = subs
 
-    const callData = JSON.stringify({
-      args,
-      event: name,
-    })
+  const callData = JSON.stringify({
+    args,
+    event: name,
+  })
 
-    subscription.remove()
+  subscription.remove()
 
-    return NativeModules.GoCall.cancel(callData)
-   {{end}}
+  return NativeModules.GoCall.cancel(callData)
+  {{end}}
 }
 
 export async function runApiCall(name: string, args :any[]) : Promise<any> {
