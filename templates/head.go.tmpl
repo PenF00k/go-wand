@@ -3,11 +3,12 @@ package {{.Package}}
 import (
 	"encoding/json"
 	"log"
-	"fmt"
-	"os"
 	"errors"
 	"strconv"
-	{{if .Dev }}"net/http"{{end}}
+	{{if .Dev -}}
+	"net/http"
+	"fmt"
+	"os"{{end}}
 	"gitlab.vmassive.ru/wand/goapi"
 	"github.com/mitchellh/mapstructure"
 	"{{ .SourcePackage }}"
