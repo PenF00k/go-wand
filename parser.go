@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gitlab.vmassive.ru/wand/proto"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -87,6 +88,9 @@ func Parse(codeList *generator.CodeList) error {
 		jsGen := js.New(codeList.PathMap.Js, packageName)
 		jsGen.CreateCode(codeList)
 
+		protoGen := proto.New(codeList.PathMap.Proto, packageName)
+		protoGen.CreateCode(codeList)
+
 		goGen := gocall.New(codeList.PathMap.Target, packageName)
 		goGen.CreateCode(codeList)
 	} else {
@@ -165,6 +169,7 @@ var annotationList = []string{
 	"get",
 	"update",
 	"callback",
+	"ignore",
 }
 
 func getAnnotation(comments []string) ([]string, *generator.Annotation) {
@@ -245,8 +250,9 @@ func createType(codeList *generator.CodeList, typeSpec *ast.TypeSpec) {
 
 	switch x := typeSpec.Type.(type) {
 	case *ast.StructType:
-		strct := createStructure(x, typeSpec.Name.Name, typeSpec.Doc)
-		codeList.AddStructure(strct)
+		if strct, ok := createStructure(x, typeSpec.Name.Name, typeSpec.Doc); ok {
+			codeList.AddStructure(strct)
+		}
 
 	case *ast.InterfaceType:
 	}
@@ -263,15 +269,29 @@ func getComments(commGroup *ast.CommentGroup) []string {
 	return comments
 }
 
-func createStructure(structType *ast.StructType, name string, commGroup *ast.CommentGroup) generator.ExportedStucture {
+func createStructure(structType *ast.StructType, name string, commGroup *ast.CommentGroup) (generator.ExportedStucture, bool) {
 	comments := getComments(commGroup)
-
 	comments, annotations := GetAnnotations(comments)
+
+	if containsAnnotation("ignore", annotations) {
+		log.Infof("ignoring %s ", name)
+		return generator.ExportedStucture{}, false
+	}
 
 	return generator.ExportedStucture{
 		Comments:   comments,
 		Name:       name,
 		Field:      structType.Fields,
 		Annotation: annotations,
+	}, true
+}
+
+func containsAnnotation(name string, list []generator.Annotation) bool {
+	for _, item := range list {
+		if item.Name == name {
+			return true
+		}
 	}
+
+	return false
 }

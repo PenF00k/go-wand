@@ -1,0 +1,5 @@
+message {{ .Name }} {
+{{range $_, $item := .Field}}
+    {{ $item.Type }} {{ $item.Name }} = {{ $item.FieldNumber }};{{end}}
+}
+

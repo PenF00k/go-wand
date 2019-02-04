@@ -19,6 +19,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+//go-assets-builder  ./templates -o ./assets/assets.go -p assets
+//protoc --dart_out="./generated" client.proto timestamp.proto
+
 func main() {
 	app := cli.NewApp()
 	app.EnableBashCompletion = true
@@ -83,11 +86,13 @@ func runApplication(configName string, dev bool) {
 
 	createDirectory(targetGoCallPath)
 	createDirectory(configuration.Js.Path)
+	createDirectory(configuration.Proto.Path)
 
 	pathMap := generator.PathMap{
 		Source: fullGoSourcePath,
 		Target: targetGoCallPath,
 		Js:     configuration.Js.Path,
+		Proto:  configuration.Proto.Path,
 	}
 
 	goPackageName := configuration.Wrapper.Package

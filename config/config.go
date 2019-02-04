@@ -19,6 +19,10 @@ type Js struct {
 	Path string
 }
 
+type Proto struct {
+	Path string
+}
+
 type Wrapper struct {
 	Package string
 	Port    int16
@@ -28,6 +32,7 @@ type Configuration struct {
 	Source  Source
 	Wrapper Wrapper
 	Js      Js
+	Proto   Proto
 }
 
 func requestString(name string) string {
@@ -51,6 +56,7 @@ func StoreConfig() {
 
 	configuration.Source.Package = requestString("Your go package to wrap: ")
 	configuration.Js.Path = requestString("Target JS directory: ")
+	configuration.Proto.Path = requestString("Target Proto directory: ")
 	configuration.Wrapper.Package = requestString("Wrapper's package name: ")
 	configuration.Wrapper.Port = 9009
 

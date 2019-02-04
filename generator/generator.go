@@ -32,6 +32,7 @@ type PathMap struct {
 	Source string
 	Target string
 	Js     string
+	Proto  string
 }
 
 type CodeList struct {
