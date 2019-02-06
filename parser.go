@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"gitlab.vmassive.ru/wand/caster"
+	"gitlab.vmassive.ru/wand/generator/gocall"
 	"gitlab.vmassive.ru/wand/proto"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os/exec"
 	"reflect"
 	"strings"
 
@@ -12,8 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"gitlab.vmassive.ru/wand/generator"
-	"gitlab.vmassive.ru/wand/gocall"
-	"gitlab.vmassive.ru/wand/js"
 )
 
 func restoreCommentForType(commentMap *ast.CommentMap, fileSet *token.FileSet, typeSpec *ast.TypeSpec) {
@@ -53,7 +56,7 @@ func Parse(codeList *generator.CodeList) error {
 	oldState := *codeList
 	codeList.Functions = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	codeList.Structures = make([]generator.ExportedStucture, 0, len(codeList.Functions)+8)
-	codeList.Pure = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
+	//codeList.Pure = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	packageName := "unknown"
 
 	for name, pkg := range pkgs {
@@ -85,11 +88,13 @@ func Parse(codeList *generator.CodeList) error {
 	codeList.PackageName = packageName
 
 	if hasChanges(codeList, &oldState) {
-		jsGen := js.New(codeList.PathMap.Js, packageName)
-		jsGen.CreateCode(codeList)
+		//jsGen := js.New(codeList.PathMap.Js, packageName)
+		//jsGen.CreateCode(codeList)
 
 		protoGen := proto.New(codeList.PathMap.Proto, packageName)
 		protoGen.CreateCode(codeList)
+
+		generateGoFilesFromProto(codeList, packageName)
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName)
 		goGen.CreateCode(codeList)
@@ -109,12 +114,12 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 		return true
 	}
 
-	if len(newState.Pure) != len(oldState.Pure) {
-		return true
-	}
+	//if len(newState.Pure) != len(oldState.Pure) {
+	//	return true
+	//}
 
 	if reflect.DeepEqual(newState.Functions, oldState.Functions) &&
-		reflect.DeepEqual(newState.Pure, oldState.Pure) &&
+	//reflect.DeepEqual(newState.Pure, oldState.Pure) &&
 		reflect.DeepEqual(newState.Structures, oldState.Structures) {
 		return true
 	}
@@ -122,21 +127,10 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 	return false
 }
 
-func createFunctionParameters(funcDecl *ast.FuncDecl) (*generator.FunctionData, *generator.FunctionData) {
+func createFunctionParameters(funcDecl *ast.FuncDecl) *generator.FunctionData {
 	comments := getComments(funcDecl.Doc)
-	comments, subscription := getSubriptionAnnotatedType(comments)
-	comments, returnType := getCallbackAnnotatedType(comments)
-
-	if subscription == nil && returnType == "any" {
-		return nil, &generator.FunctionData{
-			Subscription: subscription,
-			Comments:     comments,
-			ReturnType:   returnType,
-			Name:         funcDecl.Name.Name,
-			Params:       funcDecl.Type.Params,
-			CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
-		}
-	}
+	subscription := getSubscriptionType(funcDecl.Type)
+	returnType := getCallbackType(funcDecl)
 
 	return &generator.FunctionData{
 		Subscription: subscription,
@@ -145,23 +139,22 @@ func createFunctionParameters(funcDecl *ast.FuncDecl) (*generator.FunctionData, 
 		Name:         funcDecl.Name.Name,
 		Params:       funcDecl.Type.Params,
 		CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
-	}, nil
+	}
 }
 
-func getCallbackAnnotatedType(comments []string) ([]string, string) {
-	if comments == nil || len(comments) == 0 {
-		return comments, "any"
+func getCallbackType(funcDecl *ast.FuncDecl) string {
+	resultTypes := funcDecl.Type.Results
+
+	if resultTypes == nil {
+		return ""
 	}
 
-	lastString := comments[len(comments)-1]
-
-	if strings.HasPrefix(lastString, "@callback:") {
-		callbackType := strings.TrimPrefix(lastString, "@callback:")
-		otherComments := comments[0 : len(comments)-1]
-		return otherComments, strings.TrimSpace(callbackType)
+	if resultTypes.List == nil || len(resultTypes.List) != 2 {
+		log.Warnf("The function %v must return 2 values, skipping...", funcDecl.Name.Name)
+		return ""
 	}
 
-	return comments, "any"
+	return caster.GetFullGoTypeAsString(resultTypes.List[0].Type, "")
 }
 
 var annotationList = []string{
@@ -212,21 +205,49 @@ func GetAnnotations(comments []string) ([]string, []generator.Annotation) {
 	return outList, annotations
 }
 
-func getSubriptionAnnotatedType(comments []string) ([]string, *string) {
-	if comments == nil || len(comments) == 0 {
-		return comments, nil
+func getSubscriptionType(funcTypes *ast.FuncType) *string {
+	resultTypes := funcTypes.Results
+	paramTypes := funcTypes.Params
+
+	if resultTypes == nil {
+		return nil
 	}
 
-	lastString := comments[len(comments)-1]
-
-	if strings.HasPrefix(lastString, "@subscription:") {
-		callbackType := strings.TrimPrefix(lastString, "@subscription:")
-		otherComments := comments[0 : len(comments)-1]
-		subName := strings.TrimSpace(callbackType)
-		return otherComments, &subName
+	isSubscription := false
+	for _, t := range resultTypes.List {
+		if t != nil {
+			if selType, ok := t.Type.(*ast.SelectorExpr); ok {
+				if x, ok := selType.X.(*ast.Ident); ok {
+					if x.Name == "goapi" && selType.Sel.Name == "Subscription" {
+						isSubscription = true
+						break
+					}
+				}
+			}
+		}
 	}
 
-	return comments, nil
+	log.Infof("isSubscription %v", isSubscription)
+
+	if !isSubscription {
+		return nil
+	}
+
+	for _, ft := range paramTypes.List {
+		if t, ok := ft.Type.(*ast.FuncType); ok {
+			for _, n := range ft.Names {
+				log.Infof("field type name is %#+v", n)
+				if n.Name == "onEvent" {
+					params := t.Params.List
+					if len(params) > 0 && len(params[0].Names) > 0 {
+						return &params[0].Names[0].Name
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func createFuction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
@@ -234,12 +255,7 @@ func createFuction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 		return
 	}
 
-	function, pure := createFunctionParameters(funcDecl)
-	if function != nil {
-		codeList.AddFunction(*function)
-	} else {
-		codeList.AddPureFunction(*pure)
-	}
+	codeList.AddFunction(*createFunctionParameters(funcDecl))
 }
 
 func createType(codeList *generator.CodeList, typeSpec *ast.TypeSpec) {
@@ -294,4 +310,20 @@ func containsAnnotation(name string, list []generator.Annotation) bool {
 	}
 
 	return false
+}
+
+func generateGoFilesFromProto(codeList *generator.CodeList, packageName string) {
+	cmd := exec.Command("protoc", "--go_out=.", packageName+".proto")
+	cmd.Dir = codeList.PathMap.Proto
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		log.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return
+	}
 }

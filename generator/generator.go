@@ -29,23 +29,25 @@ type ExportedStucture struct {
 }
 
 type PathMap struct {
-	Source string
-	Target string
-	Js     string
-	Proto  string
+	Source   string
+	Target   string
+	Js       string
+	Proto    string
+	ProtoRel string
 }
 
 type CodeList struct {
-	Package       string
-	PackageName   string
-	Dev           bool
-	Port          int16
-	SourcePackage string
-	Structures    []ExportedStucture
-	Functions     []FunctionData
-	Pure          []FunctionData
-	Config        *config.Configuration
-	PathMap       PathMap
+	Package          string
+	PackageName      string
+	ProtoPackageName string
+	Dev              bool
+	Port             int16
+	SourcePackage    string
+	Structures       []ExportedStucture
+	Functions        []FunctionData
+	//Pure          []FunctionData
+	Config  *config.Configuration
+	PathMap PathMap
 }
 
 func (list *CodeList) AddStructure(structure ExportedStucture) {
@@ -56,9 +58,9 @@ func (list *CodeList) AddFunction(function FunctionData) {
 	list.Functions = append(list.Functions, function)
 }
 
-func (list *CodeList) AddPureFunction(function FunctionData) {
-	list.Pure = append(list.Pure, function)
-}
+//func (list *CodeList) AddPureFunction(function FunctionData) {
+//	list.Pure = append(list.Pure, function)
+//}
 
 type Generator interface {
 	CreateCode(source *CodeList) error

@@ -1,7 +1,7 @@
 source:
-  package: gitlab.vmassive.ru/demo
+  package: gitlab.vmassive.ru/client
 wrapper:
-  package: demolink
+  package: gitlab.vmassive.ru/client/cliwand2-demo
   port: 9009
 js:
-  path: ../DemoApp
+  path: ../demo_js

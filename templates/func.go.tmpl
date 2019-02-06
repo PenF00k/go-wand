@@ -1,13 +1,14 @@
+{{ $protoPackageName := .ProtoPackageName }}
 
 {{define "typeCast"}}
-   {{if eq .Type "string" -}} 
+   {{if eq .Type "string" -}}
       if arg == nil {
-         return "", errors.New("wrong type") 
-      }  
-         
+         return "", errors.New("wrong type")
+      }
+
       str, ok := arg.(string)
       if !ok {
-         num, ok := arg.(float64) 
+         num, ok := arg.(float64)
          if ok {
             return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
          }
@@ -16,12 +17,12 @@
       }
 
       return str, nil
-   {{- else if eq .Type "int" -}} 
+   {{- else if eq .Type "int" -}}
       if arg == nil {
-         return 0, errors.New("wrong type") 
+         return 0, errors.New("wrong type")
       }
-            
-      str, ok := arg.(string) 
+
+      str, ok := arg.(string)
       if ok {
          return strconv.Atoi(str)
       }
@@ -31,24 +32,24 @@
       }
 
       return arg.(int), nil
-      {{- else if eq .Type "float32" -}} 
-      str, ok := arg.(string) 
+      {{- else if eq .Type "float32" -}}
+      str, ok := arg.(string)
       if ok {
-         fl, err := strconv.ParseFloat(float32) 
+         fl, err := strconv.ParseFloat(float32)
          if err == nil {
             return fl
          }
          return 0, errors.New("invalid data")
       }
       return arg.(float32), nil
-   {{- else -}}  
+   {{- else -}}
       obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
       err := mapstructure.Decode(arg, &obj)
 
-      {{if .RichType.Pointer }} 
-      return &obj, err   
+      {{if .RichType.Pointer }}
+      return &obj, err
       {{ else }}
-      return obj, err   
+      return obj, err
       {{ end }}
    {{- end -}}
 {{end -}}
@@ -57,7 +58,7 @@
             {{if eq .SimpleType "string"}}
                str, ok := arg.(string)
                if !ok {
-                  num, ok := arg.(float64) 
+                  num, ok := arg.(float64)
                   if ok {
                      return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
                   }
@@ -66,12 +67,12 @@
                }
 
                return str, nil
-            {{else if eq .SimpleType "int"}} 
+            {{else if eq .SimpleType "int"}}
                if arg == nil {
-                  return 0, errors.New("wrong type") 
+                  return 0, errors.New("wrong type")
                }
 
-               str, ok := arg.(string) 
+               str, ok := arg.(string)
                if ok {
                   return strconv.Atoi(str)
                }
@@ -82,28 +83,28 @@
                }
 
                return arg.(int), nil
-            {{else if eq .SimpleType "float32"}} 
+            {{else if eq .SimpleType "float32"}}
                if arg == nil {
-                  return 0, errors.New("wrong type") 
+                  return 0, errors.New("wrong type")
                }
 
-               str, ok := arg.(string) 
+               str, ok := arg.(string)
                if ok {
-                  fl, err := strconv.ParseFloat(float32) 
+                  fl, err := strconv.ParseFloat(float32)
                   if err == nil {
                      return fl
                   }
                   return 0, errors.New("invalid data")
                }
                return arg.(float32), nil
-            {{else if eq .SimpleType "int32"}} 
+            {{else if eq .SimpleType "int32"}}
                if arg == nil {
-                  return 0, errors.New("wrong type") 
+                  return 0, errors.New("wrong type")
                }
 
-               str, ok := arg.(string) 
+               str, ok := arg.(string)
                if ok {
-                  val, err := strconv.Atoi(str)                  
+                  val, err := strconv.Atoi(str)
                   return int32(val), err
                }
 
@@ -117,18 +118,18 @@
                obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
                err := mapstructure.Decode(arg, &obj)
 
-               {{if .RichType.Pointer }} 
-               return &obj, err   
+               {{if .RichType.Pointer }}
+               return &obj, err
                {{ else }}
-               return obj, err   
+               return obj, err
                {{ end }}
 
             {{end}}
 {{end}}
 
 {{define "argCast" }}
-{{if .RichType.Array -}} 
-      argsSlice := arg.([]interface{}) 
+{{if .RichType.Array -}}
+      argsSlice := arg.([]interface{})
       outArray := make([]{{ .RichType.SimpleType }}, 0, len(argsSlice))
 
       for _, element := range argsSlice {
@@ -140,7 +141,7 @@
             return outArray, err
          }
 
-         outArray = append(outArray, item)         
+         outArray = append(outArray, item)
       }
 
       return outArray, nil
@@ -153,23 +154,25 @@
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
-func subscribeTo{{ .Name }}(callData map[string]interface{}, event goapi.EventCallback) (goapi.Subscription, error) {
-   {{- $length := len .Params }}
-   {{ if gt $length 0 -}}
-   ________args, ok := callData["args"].([]interface{})
-   if !ok {
-      return nil,errors.New("not able to cast args, wrong type")
-   }
-   {{ end -}}
+func {{ .Name }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {
+   args := {{ $protoPackageName }}.{{ .Name }}Args{}
 
-   {{ range $index, $item := .Params }}
-   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
-   }(________args[{{$index}}])
-   if err != nil {
+   if err := proto.Unmarshal(argsBytes, &args); err != nil {
       return nil, err
-   }{{ end }}
+   }
 
-   return {{ .Package}}.{{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }},{{end}}event)
+   return {{ .Package }}.{{ .Name }}(int(args.I), args.S, args.F, args.B, unit, units, func(data MyProtoResponseData) {
+      dataProto := {{ .ProtoPackageName }}.MyProtoResponseData{
+            Message: data.Message,
+            Number:  int32(data.Number),
+         }
+         bytes, err := proto.Marshal(&dataProto)
+         if err == nil {
+            callback.OnEvent(bytes)
+      }
+   })
+
+   return {{ .Package }}.{{ .Name }}(args, callback)
 }
 
 /**{{range $_, $item := .Comments}}

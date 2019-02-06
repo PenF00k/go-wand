@@ -3,10 +3,8 @@ package proto
 import (
 	"errors"
 	"fmt"
-	"gitlab.vmassive.ru/wand/assets"
 	"go/ast"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -22,6 +20,11 @@ type Field struct {
 	Type        string
 	Comment     []string
 	FieldNumber int
+}
+
+type FunctionFieldStructure struct {
+	Name   string
+	Field []Field
 }
 
 type Function struct {
@@ -86,26 +89,17 @@ func (generator ProtoCodeGenerator) writeGeneral(source *generator.CodeList) err
 
 	defer f.Close()
 	writeHeader(f, source)
+	writeFunctionFieldStructures(f, source)
 	writeStructures(f, source)
 
 	return nil
 }
 
 func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
-	file, err := assets.Assets.Open("/templates/head.proto.tmpl")
-	if err != nil {
-		log.Errorf("read file error %v", err)
-		return err
-	}
-	defer file.Close()
+	tpath := "templates/head.proto.tmpl"
+	base := path.Base(tpath)
 
-	headBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Errorf("read file error %v", err)
-		return err
-	}
-
-	headTemplate, err := template.New("structType").Parse(string(headBytes))
+	headTemplate, err := template.New(base).ParseFiles(tpath)
 	if err != nil {
 		log.Errorf("failed to write head with error %v", err)
 		return err
@@ -117,6 +111,14 @@ func writeHeader(f io.Writer, sourceList *generator.CodeList) error {
 func writeStructures(wr io.Writer, source *generator.CodeList) {
 	for _, strct := range source.Structures {
 		writeStructure(wr, strct)
+	}
+}
+
+func writeFunctionFieldStructures(wr io.Writer, source *generator.CodeList) {
+	for _, fn := range source.Functions {
+		if fn.Subscription != nil {
+			writeFunctionFieldStructure(wr, fn)
+		}
 	}
 }
 
@@ -169,20 +171,10 @@ func createMapProtoType(m *ast.MapType) string {
 }
 
 func writeStructure(wr io.Writer, structType generator.ExportedStucture) {
-	file, err := assets.Assets.Open("/templates/struct.proto.tmpl")
-	defer file.Close()
-	if err != nil {
-		log.Errorf("read file error %v", err)
-		return
-	}
+	tpath := "templates/struct.proto.tmpl"
+	base := path.Base(tpath)
 
-	b, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Errorf("read file error %v", err)
-		return
-	}
-
-	t, err := template.New("structType").Parse(string(b))
+	t, err := template.New(base).ParseFiles(tpath)
 	if err != nil {
 		log.Errorf("failed with error %v", err)
 		return
@@ -194,17 +186,40 @@ func writeStructure(wr io.Writer, structType generator.ExportedStucture) {
 	}
 }
 
+func writeFunctionFieldStructure(wr io.Writer, functionData generator.FunctionData) {
+	tpath := "templates/struct.proto.tmpl"
+	base := path.Base(tpath)
+
+	t, err := template.New(base).ParseFiles(tpath)
+	if err != nil {
+		log.Errorf("failed with error %v", err)
+		return
+	}
+
+	s := createFunctionFieldStructure(functionData)
+	err = t.Execute(wr, s)
+	if err != nil {
+		log.Errorf("template failed with error %v", err)
+	}
+}
+
+func createFunctionFieldStructure(functionData generator.FunctionData) FunctionFieldStructure {
+	return FunctionFieldStructure{
+		Name: functionData.Name + "Args",
+		Field: createListOfFields(functionData.Params),
+	}
+}
+
 func createStructure(structType generator.ExportedStucture) Structure {
 	return Structure{
 		Name:       structType.Name,
-		Field:      createListOfFields(structType),
+		Field:      createListOfFields(structType.Field),
 		Comments:   structType.Comments,
 		Annotation: structType.Annotation,
 	}
 }
 
-func createListOfFields(gen generator.ExportedStucture) []Field {
-	list := gen.Field
+func createListOfFields(list *ast.FieldList) []Field {
 	fields := make([]Field, 0, 100)
 	for i, field := range list.List {
 		typeName := createProtoType(field.Type)

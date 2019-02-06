@@ -3,187 +3,135 @@ package goapi
 import (
 	"fmt"
 	"runtime/debug"
-	"strconv"
-	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// JsCallback the interface for any callbacks
-type JsCallback interface {
-	OnSuccess(result interface{})
-	OnError(err interface{})
+// FuncCallback the interface for any callbacks
+type FuncCallback interface {
+	OnSuccess(bytes []byte)
+	OnError(err string)
 }
 
-// JsEvent the interface for any events
-type JsEvent interface {
-	OnEvent(eventName string, json interface{})
+// Event the interface for any events
+type Event interface {
+	OnEvent(eventName string, bytes []byte)
 }
 
 type EventCallback interface {
-	OnEvent(data interface{})
+	OnEvent(bytes []byte)
 }
 
 type Subscription interface {
 	Cancel()
 }
 
-func BuildSubscriptionName(funcName string, params []interface{}) string {
-	list := make([]string, 0, len(params))
-	for _, param := range params {
-		switch x := param.(type) {
-		case string:
-			list = append(list, x)
-		case int:
-			list = append(list, strconv.Itoa(x))
-
-		case int16:
-			list = append(list, strconv.FormatInt(int64(x), 10))
-
-		case int32:
-			list = append(list, strconv.FormatInt(int64(x), 10))
-
-		case int64:
-			list = append(list, strconv.FormatInt(x, 10))
-
-		case float32:
-			list = append(list, strconv.FormatFloat((float64)(x), 'f', -1, 64))
-
-		case float64:
-			list = append(list, strconv.FormatFloat((float64)(x), 'f', -1, 64))
-		}
-	}
-
-	tail := strings.Join(list, ":")
-	return funcName + ":" + tail
-}
-
 // CallFunc type for general callback function
-type CallFunc func(map[string]interface{}, JsCallback) error
+type CallFunc func([]byte, FuncCallback) error
 
 // SubFunc  type for general event function
-type SubFunc func(map[string]interface{}, EventCallback) (Subscription, error)
+type SubFunc func([]byte, EventCallback) (Subscription, error)
 
-type SubTypesFunc func(callData []interface{}) ([]interface{}, error)
+type SubTypesFunc func(eventName string, callData []byte) (string, error)
 
 type subscriptionAdapter struct {
 	subscriptionFunc      SubFunc
 	subscriptionTypesFunc SubTypesFunc
 }
 
-type JsRegistry struct {
+type Registry struct {
 	subscriptions        map[string]*subscriptionAdapter
 	functions            map[string]CallFunc
 	subscriptionRegistry SubscriptionRegistry
 }
 
-func NewJsRegistry() JsRegistry {
-	return JsRegistry{
+func NewRegistry() Registry {
+	return Registry{
 		subscriptions:        make(map[string]*subscriptionAdapter),
 		functions:            make(map[string]CallFunc),
 		subscriptionRegistry: NewSubscriptionRegistry(),
 	}
 }
 
-func (registry *JsRegistry) RegisterSubscription(eventName string, subFunc SubFunc, typeFunction SubTypesFunc) {
+func (registry *Registry) RegisterSubscription(eventName string, subFunc SubFunc, typeFunction SubTypesFunc) {
 	registry.subscriptions[eventName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
 }
 
-func (registry *JsRegistry) RegisterFunction(functionName string, adapterFunction CallFunc) {
+func (registry *Registry) RegisterFunction(functionName string, adapterFunction CallFunc) {
 	registry.functions[functionName] = adapterFunction
 }
 
-func (registry *JsRegistry) RegisterEventCallback(callback JsEvent) {
+func (registry *Registry) RegisterEventCallback(callback Event) {
 	registry.subscriptionRegistry.SetCallback(callback)
 }
 
-func (registry *JsRegistry) Subscribe(subscriptionData map[string]interface{}) {
-	eventName, ok := subscriptionData["event"].(string)
-	if ok {
-		adapter := registry.subscriptions[eventName]
-		if adapter != nil {
-			args, ok := subscriptionData["args"].([]interface{})
-			if ok {
-				typedArgs, err := adapter.subscriptionTypesFunc(args)
-				if err == nil {
-					eventName = BuildSubscriptionName(eventName, typedArgs)
-					registry.subscriptionRegistry.RegisterSubscription(eventName, subscriptionData, adapter.subscriptionFunc)
-				}
-			} else {
-				log.Errorf("Can't handle event %s : %#+v", eventName, subscriptionData)
-			}
+func (registry *Registry) Subscribe(eventName string, args []byte) {
+	adapter := registry.subscriptions[eventName]
+	if adapter != nil {
+		fullEventName, err := adapter.subscriptionTypesFunc(eventName, args)
+		if err == nil {
+			err = registry.subscriptionRegistry.RegisterSubscription(fullEventName, args, adapter.subscriptionFunc)
+		}
+		if err != nil {
+			log.Errorf("Couldn't get Subscribe for event %s with error: %v", eventName, err)
 		}
 	} else {
-		log.Errorf("Wrong subscribe call: no event field %#+v", subscriptionData)
+		log.Errorf("No adapter for event %s", eventName)
 	}
 }
 
-func (registry *JsRegistry) CancelSubscription(subscriptionData map[string]interface{}) {
-	eventName, ok := subscriptionData["event"].(string)
-	if ok {
-		adapter := registry.subscriptions[eventName]
-		if adapter != nil {
-			args, ok := subscriptionData["args"].([]interface{})
-			if ok {
-				typedArgs, err := adapter.subscriptionTypesFunc(args)
-				if err == nil {
-					eventName = BuildSubscriptionName(eventName, typedArgs)
-					registry.subscriptionRegistry.CancelSubscription(eventName)
-				}
-			} else {
-				log.Errorf("No args in event request %s", eventName)
-			}
+func (registry *Registry) CancelSubscription(eventName string, args []byte) {
+	adapter := registry.subscriptions[eventName]
+	if adapter != nil {
+		fullEventName, err := adapter.subscriptionTypesFunc(eventName, args)
+		if err == nil {
+			registry.subscriptionRegistry.CancelSubscription(fullEventName, args)
 		} else {
-			log.Errorf("No adapter for event %s", eventName)
+			log.Errorf("Couldn't get CancelSubscription for event %s with error: %v", eventName, err)
 		}
 	} else {
-		log.Errorf("Wrong cancelSubscription call: no event field %#+v", subscriptionData)
+		log.Errorf("No adapter for event %s", eventName)
 	}
 }
 
-func (registry *JsRegistry) Call(methodCallData map[string]interface{}, callback JsCallback) {
-	methodName, ok := methodCallData["method"].(string)
-	if ok {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Errorf("[!!!] Method \"%s\" crashed", methodName)
-				fmt.Printf("%v", r)
+func (registry *Registry) Call(methodName string, args []byte, callback FuncCallback) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("[!!!] Method \"%s\" crashed", methodName)
+			fmt.Printf("%v", r)
 
-				stack := debug.Stack()
+			stack := debug.Stack()
 
-				stackLines := strings.Split(string(stack), "\n")
-
-				callback.OnError(stackLines)
-			}
-		}()
-
-		functionCall := registry.functions[methodName]
-		if functionCall != nil {
-			log.Printf("[CALL] methodName %s", methodName)
-			err := functionCall(methodCallData, callback)
-			if err != nil {
-				callback.OnError(err.Error())
-			}
-		} else {
-			log.Errorf("methodName not found %s", methodName)
-			callback.OnError("no such method: " + methodName)
+			callback.OnError(string(stack))
 		}
+	}()
+
+	functionCall := registry.functions[methodName]
+	if functionCall != nil {
+		log.Printf("[CALL] methodName %s", methodName)
+		err := functionCall(args, callback)
+		if err != nil {
+			callback.OnError(err.Error())
+		}
+	} else {
+		log.Errorf("methodName not found %s", methodName)
+		callback.OnError("no such method: " + methodName)
 	}
 }
 
-type JsEventCall struct {
-	callback JsEvent
+type EventCall struct {
+	callback Event
 }
 
-func (jsEvent *JsEventCall) SetCallback(callback JsEvent) {
-	jsEvent.callback = callback
+func (event *EventCall) SetCallback(callback Event) {
+	event.callback = callback
 }
 
-func (jsEvent JsEventCall) OnEvent(eventName string, data interface{}) {
-	if jsEvent.callback != nil {
+func (event EventCall) OnEvent(eventName string, data []byte) {
+	if event.callback != nil {
 		log.Printf("sending event %s", eventName)
-		jsEvent.callback.OnEvent(eventName, data)
+		event.callback.OnEvent(eventName, data)
 	} else {
 		log.Printf("skipping event, no active callbback")
 	}
@@ -191,17 +139,17 @@ func (jsEvent JsEventCall) OnEvent(eventName string, data interface{}) {
 
 type NamedEvent struct {
 	eventName string
-	callback  *JsEventCall
+	callback  *EventCall
 }
 
-func NewNamedEvent(eventName string, callback *JsEventCall) EventCallback {
+func NewNamedEvent(eventName string, callback *EventCall) EventCallback {
 	return &NamedEvent{
 		eventName: eventName,
 		callback:  callback,
 	}
 }
 
-func (named *NamedEvent) OnEvent(data interface{}) {
+func (named *NamedEvent) OnEvent(data []byte) {
 	log.Printf("got event %s", named.eventName)
 	named.callback.OnEvent(named.eventName, data)
 }
@@ -212,7 +160,7 @@ type subscriptionData struct {
 }
 
 type SubscriptionRegistry struct {
-	callback JsEventCall
+	callback EventCall
 	active   map[string]*subscriptionData
 	lock     sync.Mutex
 }
@@ -223,11 +171,11 @@ func NewSubscriptionRegistry() SubscriptionRegistry {
 	}
 }
 
-func (registry *SubscriptionRegistry) SetCallback(callback JsEvent) {
+func (registry *SubscriptionRegistry) SetCallback(callback Event) {
 	registry.callback.SetCallback(callback)
 }
 
-func (registry *SubscriptionRegistry) CancelSubscription(eventName string) {
+func (registry *SubscriptionRegistry) CancelSubscription(eventName string, args []byte) {
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
@@ -243,8 +191,8 @@ func (registry *SubscriptionRegistry) CancelSubscription(eventName string) {
 	}
 }
 
-func (registry *SubscriptionRegistry) RegisterSubscription(eventName string, params map[string]interface{}, newCall SubFunc) error {
-	log.Printf("new subscriptioin for %s", eventName)
+func (registry *SubscriptionRegistry) RegisterSubscription(eventName string, params []byte, newCall SubFunc) error {
+	log.Printf("new subscription for %s", eventName)
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 

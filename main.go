@@ -2,19 +2,16 @@ package main
 
 import (
 	"go/build"
-	"net/http"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"gitlab.vmassive.ru/wand/config"
 	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/reload"
-	"gitlab.vmassive.ru/wand/web"
-
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -39,7 +36,7 @@ func main() {
 	}
 
 	app.Name = "wand"
-	app.Usage = "magic link beetween go and js"
+	app.Usage = "magic link between go and js"
 	app.Action = func(c *cli.Context) error {
 		runApplication(c.String("config"), !c.Bool("release"))
 		return nil
@@ -86,13 +83,17 @@ func runApplication(configName string, dev bool) {
 
 	createDirectory(targetGoCallPath)
 	createDirectory(configuration.Js.Path)
-	createDirectory(configuration.Proto.Path)
+
+	protoPath := path.Join(targetGoCallPath, "proto")
+	protoRelPath := path.Join(configuration.Wrapper.Package, "proto")
+	createDirectory(protoPath)
 
 	pathMap := generator.PathMap{
-		Source: fullGoSourcePath,
-		Target: targetGoCallPath,
-		Js:     configuration.Js.Path,
-		Proto:  configuration.Proto.Path,
+		Source:   fullGoSourcePath,
+		Target:   targetGoCallPath,
+		Js:       configuration.Js.Path,
+		Proto:    protoPath,
+		ProtoRel: protoRelPath,
 	}
 
 	goPackageName := configuration.Wrapper.Package
@@ -101,12 +102,13 @@ func runApplication(configName string, dev bool) {
 	}
 
 	codeList := &generator.CodeList{
-		Package:       goPackageName,
-		Dev:           dev,
-		Port:          configuration.Wrapper.Port,
-		SourcePackage: configuration.Source.Package,
-		PathMap:       pathMap,
-		Config:        configuration,
+		Package:          goPackageName,
+		ProtoPackageName: "proto_client",
+		Dev:              dev,
+		Port:             configuration.Wrapper.Port,
+		SourcePackage:    configuration.Source.Package,
+		PathMap:          pathMap,
+		Config:           configuration,
 	}
 
 	if dev {
@@ -133,7 +135,6 @@ func watchGo(codeList *generator.CodeList) {
 	shutdown(rel)
 
 	go rel.Run()
-	go webFace()
 
 	done := make(chan bool)
 	go func() {
@@ -177,12 +178,6 @@ func createDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, os.ModePerm)
 	}
-}
-
-func webFace() {
-	fs := http.FileServer(web.Assets)
-	http.Handle("/", http.StripPrefix("", fs))
-	http.ListenAndServe(":9000", nil)
 }
 
 func shutdown(runner *reload.LiveReload) {

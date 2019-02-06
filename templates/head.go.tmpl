@@ -11,12 +11,13 @@ import (
 	"os"{{end}}
 	"gitlab.vmassive.ru/wand/goapi"
 	"github.com/mitchellh/mapstructure"
-	"{{ .SourcePackage }}"
+	"{{ .PathMap.ProtoRel }}"
+	"github.com/golang/protobuf/proto"
 	{{if .Dev}}"gitlab.vmassive.ru/wand/goapi/remgo"{{end}}
 )
 
 // Registry for all calls
-var registry goapi.JsRegistry = goapi.NewJsRegistry()
+var registry = goapi.NewRegistry()
 
 
 type X_____xxxx struct { Val string }
@@ -81,82 +82,25 @@ func main() {
 	}
 }
 {{end}}
-// JsCallback the interface for any callbacks
-type JsCallback interface {
-	OnSuccess(json string)
-	OnError(json string)
+// CallMethod - call from client
+func CallMethod(methodName string, args []byte, callback goapi.FuncCallback) {
+	registry.Call(methodName, args, callback)
 }
 
-// JsEvent the interface for any events
-type JsEvent interface {
-	OnEvent(eventName string, json string)
-}
-
-type eventerSender struct {
-	event		JsEvent
-}
-
-func newEventSender(event JsEvent) goapi.JsEvent {
-	return &eventerSender{
-		event: event,
-	}
-}
-
-func (eventer eventerSender) OnEvent(eventName string, data interface{}) {
-	log.Printf(" >> + << %#v", data)
-	bytes, _ := json.Marshal(data)
-	eventer.event.OnEvent(eventName, string(bytes))
-}
-
-type callbackCaller struct {
-	callback JsCallback
-}
-
-func (caller callbackCaller) OnSuccess(data interface{}) {
-	log.Printf(" >> + << %#v", data)
-	bytes, _ := json.Marshal(data)
-	caller.callback.OnSuccess(string(bytes))
-}
-
-func (caller callbackCaller) OnError(data interface{}) {
-	bytes, _ := json.Marshal(data)
-	caller.callback.OnError(string(bytes))
-}
-
-func newCaller(callback JsCallback) goapi.JsCallback {
-	return &callbackCaller{
-		callback: callback,
-	}
-}
-
-// CallMethod - call from JS
-func CallMethod(callData string, callback JsCallback) {
-	methodCallData := make(map[string]interface{})
-	json.Unmarshal([]byte(callData), &methodCallData)
-
-	caller := newCaller(callback)
-	registry.Call(methodCallData, caller)
-}
-
-
-func RegisterEventCallback(callback JsEvent) {
-	registry.RegisterEventCallback(newEventSender(callback))
+func RegisterEventCallback(onEvent goapi.Event) {
+	registry.RegisterEventCallback(onEvent)
 }
 
 func RemoveEventCallback() {
 	registry.RegisterEventCallback(nil)
 }
 
-// Subscribe - subsribe from JS
-func Subscribe(callData string) {
-	methodCallData := make(map[string]interface{})
-	json.Unmarshal([]byte(callData), &methodCallData)
-
-	registry.Subscribe(methodCallData)
+// Subscribe - Subscribe from client
+func Subscribe(subscriptionName string, args []byte) {
+	registry.Subscribe(subscriptionName, args)
 }
 
-// Subscribe - subsribe from JS
-func Cancel(callData string) {
-	methodCallData := make(map[string]interface{})
-	registry.CancelSubscription(methodCallData)
+// Unsubscribe - Unsubscribe from client
+func Unsubscribe(subscriptionName string, args []byte) {
+	registry.CancelSubscription(subscriptionName, args)
 }
