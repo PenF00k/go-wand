@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
 
 	"gitlab.vmassive.ru/wand/generator"
@@ -138,23 +137,36 @@ func createFunctionParameters(funcDecl *ast.FuncDecl) *generator.FunctionData {
 		ReturnType:   returnType,
 		Name:         funcDecl.Name.Name,
 		Params:       funcDecl.Type.Params,
-		CallName:     strcase.ToLowerCamel(funcDecl.Name.Name),
+		CallName:     funcDecl.Name.Name,
 	}
 }
 
-func getCallbackType(funcDecl *ast.FuncDecl) string {
+func getCallbackType(funcDecl *ast.FuncDecl) *generator.ReturnTypeData {
 	resultTypes := funcDecl.Type.Results
 
 	if resultTypes == nil {
-		return ""
+		return nil
 	}
 
-	if resultTypes.List == nil || len(resultTypes.List) != 2 {
-		log.Warnf("The function %v must return 2 values, skipping...", funcDecl.Name.Name)
-		return ""
+	if resultTypes.List == nil || len(resultTypes.List) == 0 {
+		return nil
 	}
 
-	return caster.GetFullGoTypeAsString(resultTypes.List[0].Type, "")
+	var returnedTypeField *ast.FieldList
+	if funcArgType, ok := resultTypes.List[0].Type.(*ast.Ident); ok {
+		if funcArgType.Obj != nil {
+			if decl, ok := funcArgType.Obj.Decl.(*ast.TypeSpec); ok {
+				if str, ok := decl.Type.(*ast.StructType); ok {
+					returnedTypeField = str.Fields
+				}
+			}
+		}
+	}
+
+	return &generator.ReturnTypeData{
+		Name:  caster.GetFullGoTypeAsString(resultTypes.List[0].Type, ""),
+		Field: returnedTypeField,
+	}
 }
 
 var annotationList = []string{
@@ -205,7 +217,7 @@ func GetAnnotations(comments []string) ([]string, []generator.Annotation) {
 	return outList, annotations
 }
 
-func getSubscriptionType(funcTypes *ast.FuncType) *string {
+func getSubscriptionType(funcTypes *ast.FuncType) *generator.SubscriptionData {
 	resultTypes := funcTypes.Results
 	paramTypes := funcTypes.Params
 
@@ -233,14 +245,26 @@ func getSubscriptionType(funcTypes *ast.FuncType) *string {
 		return nil
 	}
 
-	for _, ft := range paramTypes.List {
-		if t, ok := ft.Type.(*ast.FuncType); ok {
-			for _, n := range ft.Names {
-				log.Infof("field type name is %#+v", n)
+	for _, paramFields := range paramTypes.List {
+		if functionType, ok := paramFields.Type.(*ast.FuncType); ok {
+			for _, n := range paramFields.Names {
 				if n.Name == "onEvent" {
-					params := t.Params.List
+					params := functionType.Params.List
 					if len(params) > 0 && len(params[0].Names) > 0 {
-						return &params[0].Names[0].Name
+						var subField *ast.FieldList
+						if funcArgType, ok := params[0].Type.(*ast.Ident); ok {
+							if funcArgType.Obj != nil {
+								if decl, ok := funcArgType.Obj.Decl.(*ast.TypeSpec); ok {
+									if str, ok := decl.Type.(*ast.StructType); ok {
+										subField = str.Fields
+									}
+								}
+							}
+						}
+						return &generator.SubscriptionData{
+							Name:  params[0].Names[0].Name,
+							Field: subField,
+						}
 					}
 				}
 			}
@@ -315,6 +339,8 @@ func containsAnnotation(name string, list []generator.Annotation) bool {
 func generateGoFilesFromProto(codeList *generator.CodeList, packageName string) {
 	cmd := exec.Command("protoc", "--go_out=.", packageName+".proto")
 	cmd.Dir = codeList.PathMap.Proto
+
+	log.Infof("executing protoc in dir %v, packageName = %v", cmd.Dir, packageName)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer

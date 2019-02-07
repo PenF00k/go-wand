@@ -1,6 +1,7 @@
 package gocall
 
 import (
+	"github.com/iancoleman/strcase"
 	"go/ast"
 	"html/template"
 	"io"
@@ -17,11 +18,23 @@ import (
 type Function struct {
 	Name             string
 	Comments         []string
-	ReturnType       string
+	ReturnType       *ReturnType
 	Params           []Field
-	Subscription     *string
+	Subscription     *Subscription
 	Package          string
 	ProtoPackageName string
+}
+
+type ReturnType struct {
+	Name string
+	//EventName string
+	Params []Field
+}
+
+type Subscription struct {
+	Name      string
+	EventName string
+	Params    []Field
 }
 
 type Type struct {
@@ -35,13 +48,40 @@ type Type struct {
 }
 
 type Field struct {
-	Name       string
-	Type       string
-	Comment    []string
-	RichType   Type
-	Array      bool
-	SimpleType string
-	Package    string
+	Name           string
+	Type           string
+	Comment        []string
+	RichType       Type
+	Array          bool
+	SimpleType     string
+	Package        string
+	FunctionParams []Field
+}
+
+func (f Field) NotIsLastField(list []Field, i int) bool {
+	return i != len(list)-1
+}
+
+func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
+	n := prefix + strcase.ToCamel(f.Name)
+
+	if target == "" {
+		return n
+	}
+
+	var formatter fieldFormatter
+	switch target {
+	case "pro":
+		formatter = ProtoFormatter
+	case "go":
+		formatter = GoFormatter
+	}
+
+	if formatter != nil {
+		n = formatter.format(f.Type, n)
+	}
+
+	return n
 }
 
 type GoCodeGenerator struct {
@@ -146,22 +186,74 @@ func writeFunction(wr io.Writer, pack string, function generator.FunctionData, p
 		return
 	}
 
-	err = t.Execute(wr, createFunction(pack, function, protoPackageName))
+	f := createFunction(pack, function, protoPackageName)
+	err = t.Execute(wr, f)
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
 	}
 }
 
 func createFunction(pack string, function generator.FunctionData, protoPackageName string) Function {
+	// function.Name == "SubscribeToMyProtoData"
+	params := createListOfFields(function.Params, pack)
+	size := len(params)
+
+	var sub *Subscription
+	if function.Subscription != nil && size > 0 {
+		sub = createSubscription(pack, params, function)
+
+		// trim last param (onEvent)
+		params = params[:size-1]
+	}
+
+	var returnType *ReturnType
+	if function.ReturnType != nil && size > 0 {
+		returnType = createReturnType(pack, params, function)
+
+		// trim last param (onEvent)
+		params = params[:size-1]
+	}
+	//function.ReturnType
+
 	return Function{
 		Name:             function.Name,
 		Comments:         function.Comments,
-		ReturnType:       function.ReturnType,
-		Params:           createListOfFields(function.Params, pack),
-		Subscription:     function.Subscription,
+		ReturnType:       returnType,
+		Params:           params,
+		Subscription:     sub,
 		Package:          pack,
 		ProtoPackageName: protoPackageName,
 	}
+}
+
+func createReturnType(pack string, params []Field, function generator.FunctionData) *ReturnType {
+	return nil //TODO
+}
+
+func createSubscription(pack string, params []Field, function generator.FunctionData) *Subscription {
+	var sub *Subscription
+	eventParam := function.Params.List[len(params)-1]
+
+	if tName, ok := eventParam.Type.(*ast.FuncType); ok {
+		eventParams := tName.Params.List
+		paramTypeName := ""
+
+		if len(eventParams) > 0 && len(eventParams[0].Names) > 0 {
+			if paramType, ok := eventParams[0].Type.(*ast.Ident); ok {
+				paramTypeName = paramType.Name
+			}
+		}
+
+		params := createListOfFields(function.Subscription.Field, pack)
+
+		sub = &Subscription{
+			Name:      function.Subscription.Name,
+			EventName: paramTypeName,
+			Params:    params,
+		}
+	}
+
+	return sub
 }
 
 func writeHeader(f io.Writer, sourceList *generator.CodeList) {
@@ -182,6 +274,9 @@ func writeHeader(f io.Writer, sourceList *generator.CodeList) {
 
 func createListOfFields(list *ast.FieldList, pack string) []Field {
 	fields := make([]Field, 0, 100)
+	if list == nil {
+		return fields
+	}
 	for _, field := range list.List {
 
 		typeName := createType(field.Type)
@@ -189,20 +284,26 @@ func createListOfFields(list *ast.FieldList, pack string) []Field {
 			typeName = "interface{}"
 		}
 
-		richType := createRichType(field.Type)
-
 		// Skip callback type
 		if typeName == "JsCallback" || typeName == "EventCallback" {
 			continue
 		}
 
+		richType := createRichType(field.Type)
+
+		var funcParams []Field
+		if fTyre, ok := field.Type.(*ast.FuncType); ok {
+			funcParams = createListOfFields(fTyre.Params, pack)
+		}
+
 		for _, name := range field.Names {
 			fieldInfo := Field{
-				Name:     name.Name,
-				Type:     typeName,
-				Comment:  getComments(field.Doc),
-				RichType: richType,
-				Package:  pack,
+				Name:           name.Name,
+				Type:           typeName,
+				Comment:        getComments(field.Doc),
+				RichType:       richType,
+				Package:        pack,
+				FunctionParams: funcParams,
 			}
 
 			fields = append(fields, fieldInfo)

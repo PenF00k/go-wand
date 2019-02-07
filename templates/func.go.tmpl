@@ -1,213 +1,73 @@
-{{ $protoPackageName := .ProtoPackageName }}
-
-{{define "typeCast"}}
-   {{if eq .Type "string" -}}
-      if arg == nil {
-         return "", errors.New("wrong type")
-      }
-
-      str, ok := arg.(string)
-      if !ok {
-         num, ok := arg.(float64)
-         if ok {
-            return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
-         }
-
-         return "", errors.New("wrong type, string is expected ({{ .Name  }})")
-      }
-
-      return str, nil
-   {{- else if eq .Type "int" -}}
-      if arg == nil {
-         return 0, errors.New("wrong type")
-      }
-
-      str, ok := arg.(string)
-      if ok {
-         return strconv.Atoi(str)
-      }
-      fl, ok := arg.(float64)
-      if ok {
-         return int(fl), nil
-      }
-
-      return arg.(int), nil
-      {{- else if eq .Type "float32" -}}
-      str, ok := arg.(string)
-      if ok {
-         fl, err := strconv.ParseFloat(float32)
-         if err == nil {
-            return fl
-         }
-         return 0, errors.New("invalid data")
-      }
-      return arg.(float32), nil
-   {{- else -}}
-      obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
-      err := mapstructure.Decode(arg, &obj)
-
-      {{if .RichType.Pointer }}
-      return &obj, err
-      {{ else }}
-      return obj, err
-      {{ end }}
-   {{- end -}}
-{{end -}}
-
-{{define "atomTypeCast"}}
-            {{if eq .SimpleType "string"}}
-               str, ok := arg.(string)
-               if !ok {
-                  num, ok := arg.(float64)
-                  if ok {
-                     return strconv.FormatFloat((float64)(num), 'f', -1, 64), nil
-                  }
-
-                  return "", errors.New("wrong type, string is expected for ({{ .Name  }})")
-               }
-
-               return str, nil
-            {{else if eq .SimpleType "int"}}
-               if arg == nil {
-                  return 0, errors.New("wrong type")
-               }
-
-               str, ok := arg.(string)
-               if ok {
-                  return strconv.Atoi(str)
-               }
-
-               fl, ok := arg.(float64)
-               if ok {
-                  return int(fl), nil
-               }
-
-               return arg.(int), nil
-            {{else if eq .SimpleType "float32"}}
-               if arg == nil {
-                  return 0, errors.New("wrong type")
-               }
-
-               str, ok := arg.(string)
-               if ok {
-                  fl, err := strconv.ParseFloat(float32)
-                  if err == nil {
-                     return fl
-                  }
-                  return 0, errors.New("invalid data")
-               }
-               return arg.(float32), nil
-            {{else if eq .SimpleType "int32"}}
-               if arg == nil {
-                  return 0, errors.New("wrong type")
-               }
-
-               str, ok := arg.(string)
-               if ok {
-                  val, err := strconv.Atoi(str)
-                  return int32(val), err
-               }
-
-               fl, ok := arg.(float64)
-               if ok {
-                  return int(fl), nil
-               }
-
-               return arg.(int), nil
-            {{else}}
-               obj := {{ .Package}}.{{ .RichType.SimpleType }}{}
-               err := mapstructure.Decode(arg, &obj)
-
-               {{if .RichType.Pointer }}
-               return &obj, err
-               {{ else }}
-               return obj, err
-               {{ end }}
-
-            {{end}}
-{{end}}
-
-{{define "argCast" }}
-{{if .RichType.Array -}}
-      argsSlice := arg.([]interface{})
-      outArray := make([]{{ .RichType.SimpleType }}, 0, len(argsSlice))
-
-      for _, element := range argsSlice {
-         item, err := func(arg interface{}) ({{ .RichType.SimpleType }}, error) {
-            {{template "atomTypeCast" .RichType}}
-         }(element)
-
-         if err != nil {
-            return outArray, err
-         }
-
-         outArray = append(outArray, item)
-      }
-
-      return outArray, nil
-{{else -}}
-{{template "typeCast" . -}}
-{{end -}}
-{{end -}}
-
+{{ $Params := .Params }}
+{{ $Subscription := .Subscription }}
 {{- if .Subscription }}
 /**{{range $_, $item := .Comments}}
  * {{ $item }}{{end}}
  */
 func {{ .Name }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {
-   args := {{ $protoPackageName }}.{{ .Name }}Args{}
+   args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
 
    if err := proto.Unmarshal(argsBytes, &args); err != nil {
       return nil, err
    }
 
-   return {{ .Package }}.{{ .Name }}(int(args.I), args.S, args.F, args.B, unit, units, func(data MyProtoResponseData) {
-      dataProto := {{ .ProtoPackageName }}.MyProtoResponseData{
-            Message: data.Message,
-            Number:  int32(data.Number),
-         }
-         bytes, err := proto.Marshal(&dataProto)
-         if err == nil {
-            callback.OnEvent(bytes)
+   return {{ .Package }}.{{ .Name }}({{ range $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" }}, {{ end }}func(data {{ .Package }}.{{ .Subscription.EventName }}) {
+      dataProto := {{ .ProtoPackageName }}.{{ .Subscription.EventName }}{
+         {{- range $item := $Subscription.Params }}
+            {{ $item.GetUpperCamelCaseName "" "" }}: {{ $item.GetUpperCamelCaseName "data." "pro" }},
+         {{- end }}
+      }
+
+      bytes, err := proto.Marshal(&dataProto)
+      if err == nil {
+         callback.OnEvent(bytes)
       }
    })
-
-   return {{ .Package }}.{{ .Name }}(args, callback)
 }
 
-/**{{range $_, $item := .Comments}}
- * {{ $item }}{{end}}
- */
-func subscriptionTypes{{ .Name }}(________args []interface{}) ([]interface{}, error) {
-   result := make([]interface{}, 0, len(________args))
-   {{ range $index, $item := .Params -}}
-   {{ $item.Name }}, err := func(arg interface{}) ({{ $item.Type }}, error) { {{ template "argCast" $item }}
-   }(________args[{{$index}}])
-   if err != nil {
-      return nil, err
-   }
-   result = append(result, {{ $item.Name }})
-   {{ end }}
+func getEventName{{ .Name }}(argsBytes []byte) (string, error) {
+    args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
 
-   return result, nil
-}
-{{- else }}
-func callAdapterFor{{ .Name }}(callData map[string]interface{}, callback goapi.JsCallback) error {
-   {{- $length := len .Params }}
-   {{ if gt $length 0 -}}
-   ________args, ok := callData["args"].([]interface{})
-   if !ok {
-      return errors.New("not able to cast args, wrong type")
-   }
-   {{ end }}
-   {{ range $index, $item := .Params}}
-   {{ $item.Name }}, err := func(arg interface{}) ({{if $item.RichType.Object }}{{ $item.Package}}.{{end}}{{ $item.Type }}, error) { {{ template "argCast" $item }}
-   }(________args[{{$index}}])
-   if err != nil {
-      return err
-   }{{ end }}
+	if err := proto.Unmarshal(argsBytes, &args); err != nil {
+		return "", err
+	}
 
-   {{ .Package }}.{{ .Name }}({{range $index, $item := .Params}}{{ $item.Name }}, {{end}} callback)
-   return nil
+	fullName := "{{ .Name }}" + fmt.Sprintf("
+    {{- range $item := $Params }}:%v{{ end -}}
+    ", {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "" -}}
+        {{- if .NotIsLastField $Params $i }}, {{- end -}}
+    {{- end -}})
+
+	return fullName, nil
 }
-{{- end }}
+{{ else }}
+func {{ .Name }}(argsBytes []byte, callback goapi.FuncCallback) {
+    args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
+
+	if err := proto.Unmarshal(argsBytes, &args); err != nil {
+		callback.OnError(err.Error())
+        return
+	}
+
+	res, err := {{ .Package }}.{{ .Name }}(
+    {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" -}}
+        {{- if .NotIsLastField $Params $i }}, {{- end -}}
+    {{- end }})
+	if err != nil {
+		callback.OnError(err.Error())
+	} else {
+        dataProto := {{ .ProtoPackageName }}.{{ .ReturnType }}{
+            {{- range $item := $Params }}
+                {{ $item.GetUpperCamelCaseName "" "" }}: {{ $item.GetUpperCamelCaseName "res." "pro" }},
+            {{- end }}
+        }
+
+		bytes, err := proto.Marshal(&dataProto)
+		if err == nil {
+			callback.OnSuccess(bytes)
+		} else {
+            callback.OnError(err.Error())
+        }
+	}
+}
+{{ end }}

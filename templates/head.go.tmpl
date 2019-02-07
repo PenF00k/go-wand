@@ -1,20 +1,71 @@
 package {{.Package}}
 
 import (
-	"encoding/json"
-	"log"
-	"errors"
+	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/wrappers"
+	"github.com/mitchellh/mapstructure"
+	"gitlab.vmassive.ru/client"
+	"{{ .PathMap.ProtoRel }}"
+	"gitlab.vmassive.ru/wand/goapi"
 	"strconv"
 	{{if .Dev -}}
-	"net/http"
-	"fmt"
-	"os"{{end}}
-	"gitlab.vmassive.ru/wand/goapi"
-	"github.com/mitchellh/mapstructure"
-	"{{ .PathMap.ProtoRel }}"
-	"github.com/golang/protobuf/proto"
-	{{if .Dev}}"gitlab.vmassive.ru/wand/goapi/remgo"{{end}}
+		"net/http"
+		"fmt"
+		"log"
+		"gitlab.vmassive.ru/wand/goapi/remgo"
+		"os"{{end}}
 )
+
+type FuncCallback interface {
+	OnSuccess(bytes []byte)
+	OnError(err string)
+}
+
+type Event interface {
+	OnEvent(eventName string, bytes []byte)
+}
+
+type EventCallback interface {
+	OnEvent(bytes []byte)
+}
+
+type Subscription interface {
+	Cancel()
+}
+
+type eventWrapper struct {
+	event Event
+}
+
+func (eventer eventWrapper) OnEvent(eventName string, bytes []byte) {
+	eventer.event.OnEvent(eventName, bytes)
+}
+
+
+func newEventWrapper(event Event) goapi.Event {
+	return &eventWrapper{
+		event: event,
+	}
+}
+
+type funcCallbackWrapper struct {
+	callback FuncCallback
+}
+
+func (caller funcCallbackWrapper) OnSuccess(bytes []byte) {
+	caller.callback.OnSuccess(bytes)
+}
+
+func (caller funcCallbackWrapper) OnError(err string) {
+	caller.callback.OnError(err)
+}
+
+func newFuncCallbackWrapper(callback FuncCallback) goapi.FuncCallback {
+	return &funcCallbackWrapper{
+		callback: callback,
+	}
+}
 
 // Registry for all calls
 var registry = goapi.NewRegistry()
@@ -83,12 +134,14 @@ func main() {
 }
 {{end}}
 // CallMethod - call from client
-func CallMethod(methodName string, args []byte, callback goapi.FuncCallback) {
-	registry.Call(methodName, args, callback)
+func CallMethod(methodName string, args []byte, callback FuncCallback) {
+	wrapper := newFuncCallbackWrapper(callback)
+	registry.Call(methodName, args, wrapper)
 }
 
-func RegisterEventCallback(onEvent goapi.Event) {
-	registry.RegisterEventCallback(onEvent)
+func RegisterEventCallback(onEvent Event) {
+	wrapper := newEventWrapper(onEvent)
+	registry.RegisterEventCallback(wrapper)
 }
 
 func RemoveEventCallback() {
@@ -96,11 +149,31 @@ func RemoveEventCallback() {
 }
 
 // Subscribe - Subscribe from client
-func Subscribe(subscriptionName string, args []byte) {
-	registry.Subscribe(subscriptionName, args)
+func Subscribe(subscriptionName string, args []byte, callback FuncCallback) {
+	fullSubName, err := registry.Subscribe(subscriptionName, args)
+	if err == nil {
+		w := &wrappers.StringValue{
+			Value: fullSubName,
+		}
+		bytes, err := proto.Marshal(w)
+		if err == nil {
+			callback.OnSuccess(bytes)
+			return
+		}
+	}
+
+	callback.OnError(err.Error())
 }
 
 // Unsubscribe - Unsubscribe from client
-func Unsubscribe(subscriptionName string, args []byte) {
-	registry.CancelSubscription(subscriptionName, args)
+func Unsubscribe(subscriptionName string) {
+	registry.CancelSubscription(subscriptionName)
+}
+
+func InitializeEx(lang string, storageBasePath string, server string, wsHost string, clientMode bool) {
+	client.InitializeEx(lang, storageBasePath, server, wsHost, clientMode)
+}
+
+func Destroy() {
+	client.Destroy()
 }

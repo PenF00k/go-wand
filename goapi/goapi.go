@@ -3,6 +3,7 @@ package goapi
 import (
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -16,7 +17,7 @@ type FuncCallback interface {
 
 // Event the interface for any events
 type Event interface {
-	OnEvent(eventName string, bytes []byte)
+	OnEvent(fullSubscriptionName string, bytes []byte)
 }
 
 type EventCallback interface {
@@ -33,7 +34,7 @@ type CallFunc func([]byte, FuncCallback) error
 // SubFunc  type for general event function
 type SubFunc func([]byte, EventCallback) (Subscription, error)
 
-type SubTypesFunc func(eventName string, callData []byte) (string, error)
+type SubTypesFunc func(args []byte) (string, error)
 
 type subscriptionAdapter struct {
 	subscriptionFunc      SubFunc
@@ -54,8 +55,8 @@ func NewRegistry() Registry {
 	}
 }
 
-func (registry *Registry) RegisterSubscription(eventName string, subFunc SubFunc, typeFunction SubTypesFunc) {
-	registry.subscriptions[eventName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
+func (registry *Registry) RegisterSubscription(subscriptionName string, subFunc SubFunc, typeFunction SubTypesFunc) {
+	registry.subscriptions[subscriptionName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
 }
 
 func (registry *Registry) RegisterFunction(functionName string, adapterFunction CallFunc) {
@@ -66,32 +67,28 @@ func (registry *Registry) RegisterEventCallback(callback Event) {
 	registry.subscriptionRegistry.SetCallback(callback)
 }
 
-func (registry *Registry) Subscribe(eventName string, args []byte) {
-	adapter := registry.subscriptions[eventName]
-	if adapter != nil {
-		fullEventName, err := adapter.subscriptionTypesFunc(eventName, args)
-		if err == nil {
-			err = registry.subscriptionRegistry.RegisterSubscription(fullEventName, args, adapter.subscriptionFunc)
-		}
-		if err != nil {
-			log.Errorf("Couldn't get Subscribe for event %s with error: %v", eventName, err)
-		}
-	} else {
-		log.Errorf("No adapter for event %s", eventName)
+func (registry *Registry) Subscribe(subscriptionName string, args []byte) (string, error) {
+	adapter := registry.subscriptions[subscriptionName]
+	if adapter == nil {
+		return "", fmt.Errorf("no adapter for event %s", subscriptionName)
 	}
+
+	fullSubscriptionName, err := adapter.subscriptionTypesFunc(args)
+	if err != nil {
+		return "", fmt.Errorf("couldn't get Subscribe for event %s with error: %v", subscriptionName, err)
+	}
+
+	err = registry.subscriptionRegistry.RegisterSubscription(fullSubscriptionName, args, adapter.subscriptionFunc)
+	return fullSubscriptionName, err
 }
 
-func (registry *Registry) CancelSubscription(eventName string, args []byte) {
-	adapter := registry.subscriptions[eventName]
+func (registry *Registry) CancelSubscription(fullSubscriptionName string) {
+	subscriptionName := strings.Split(fullSubscriptionName, ":")[0]
+	adapter := registry.subscriptions[subscriptionName]
 	if adapter != nil {
-		fullEventName, err := adapter.subscriptionTypesFunc(eventName, args)
-		if err == nil {
-			registry.subscriptionRegistry.CancelSubscription(fullEventName, args)
-		} else {
-			log.Errorf("Couldn't get CancelSubscription for event %s with error: %v", eventName, err)
-		}
+		registry.subscriptionRegistry.CancelSubscription(fullSubscriptionName)
 	} else {
-		log.Errorf("No adapter for event %s", eventName)
+		log.Errorf("No adapter for event %s, fullSubscriptionName: %v", subscriptionName, fullSubscriptionName)
 	}
 }
 
@@ -128,30 +125,30 @@ func (event *EventCall) SetCallback(callback Event) {
 	event.callback = callback
 }
 
-func (event EventCall) OnEvent(eventName string, data []byte) {
+func (event EventCall) OnEvent(fullSubscriptionName string, data []byte) {
 	if event.callback != nil {
-		log.Printf("sending event %s", eventName)
-		event.callback.OnEvent(eventName, data)
+		log.Printf("sending event %s", fullSubscriptionName)
+		event.callback.OnEvent(fullSubscriptionName, data)
 	} else {
 		log.Printf("skipping event, no active callbback")
 	}
 }
 
 type NamedEvent struct {
-	eventName string
-	callback  *EventCall
+	fullSubscriptionName string
+	callback             *EventCall
 }
 
-func NewNamedEvent(eventName string, callback *EventCall) EventCallback {
+func NewNamedEvent(fullSubscriptionName string, callback *EventCall) EventCallback {
 	return &NamedEvent{
-		eventName: eventName,
-		callback:  callback,
+		fullSubscriptionName: fullSubscriptionName,
+		callback:             callback,
 	}
 }
 
 func (named *NamedEvent) OnEvent(data []byte) {
-	log.Printf("got event %s", named.eventName)
-	named.callback.OnEvent(named.eventName, data)
+	log.Printf("got event %s", named.fullSubscriptionName)
+	named.callback.OnEvent(named.fullSubscriptionName, data)
 }
 
 type subscriptionData struct {
@@ -175,15 +172,17 @@ func (registry *SubscriptionRegistry) SetCallback(callback Event) {
 	registry.callback.SetCallback(callback)
 }
 
-func (registry *SubscriptionRegistry) CancelSubscription(eventName string, args []byte) {
+func (registry *SubscriptionRegistry) CancelSubscription(fullSubscriptionName string) {
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subscription := registry.active[eventName]
+	subscription := registry.active[fullSubscriptionName]
 	if subscription != nil {
 		subscription.counter--
+		log.Infof("subscription for %s was removed", fullSubscriptionName)
 		if subscription.counter == 0 {
-			registry.active[eventName] = nil
+			delete(registry.active, fullSubscriptionName)
+			log.Infof("subscription for %s was completely cancelled", fullSubscriptionName)
 			subscription.subscription.Cancel()
 		}
 	} else {
@@ -191,15 +190,15 @@ func (registry *SubscriptionRegistry) CancelSubscription(eventName string, args 
 	}
 }
 
-func (registry *SubscriptionRegistry) RegisterSubscription(eventName string, params []byte, newCall SubFunc) error {
-	log.Printf("new subscription for %s", eventName)
+func (registry *SubscriptionRegistry) RegisterSubscription(fullSubscriptionName string, args []byte, subFunc SubFunc) error {
+	log.Infof("new subscription for %s", fullSubscriptionName)
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subscription := registry.active[eventName]
+	subscription := registry.active[fullSubscriptionName]
 	if subscription == nil {
-		event := NewNamedEvent(eventName, &registry.callback)
-		sub, err := newCall(params, event)
+		event := NewNamedEvent(fullSubscriptionName, &registry.callback)
+		sub, err := subFunc(args, event)
 		if err != nil {
 			return err
 		}
@@ -208,7 +207,7 @@ func (registry *SubscriptionRegistry) RegisterSubscription(eventName string, par
 			subscription: sub,
 		}
 
-		registry.active[eventName] = subscription
+		registry.active[fullSubscriptionName] = subscription
 	}
 
 	subscription.counter++

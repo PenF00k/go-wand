@@ -3,5 +3,5 @@ source:
 wrapper:
   package: gitlab.vmassive.ru/client/cliwand2-demo
   port: 9009
-js:
-  path: ../demo_js
+proto:
+  path: proto_generated
