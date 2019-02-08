@@ -29,7 +29,7 @@ type Subscription interface {
 }
 
 // CallFunc type for general callback function
-type CallFunc func([]byte, FuncCallback) error
+type CallFunc func([]byte, FuncCallback)
 
 // SubFunc  type for general event function
 type SubFunc func([]byte, EventCallback) (Subscription, error)
@@ -107,10 +107,7 @@ func (registry *Registry) Call(methodName string, args []byte, callback FuncCall
 	functionCall := registry.functions[methodName]
 	if functionCall != nil {
 		log.Printf("[CALL] methodName %s", methodName)
-		err := functionCall(args, callback)
-		if err != nil {
-			callback.OnError(err.Error())
-		}
+		go functionCall(args, callback)
 	} else {
 		log.Errorf("methodName not found %s", methodName)
 		callback.OnError("no such method: " + methodName)

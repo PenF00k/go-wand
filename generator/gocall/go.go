@@ -1,6 +1,7 @@
 package gocall
 
 import (
+	"fmt"
 	"github.com/iancoleman/strcase"
 	"go/ast"
 	"html/template"
@@ -20,21 +21,16 @@ type Function struct {
 	Comments         []string
 	ReturnType       *ReturnType
 	Params           []Field
-	Subscription     *Subscription
+	Subscription     bool
 	Package          string
 	ProtoPackageName string
 }
 
 type ReturnType struct {
-	Name string
-	//EventName string
-	Params []Field
-}
-
-type Subscription struct {
 	Name      string
 	EventName string
 	Params    []Field
+	IsPointer bool
 }
 
 type Type struct {
@@ -45,6 +41,12 @@ type Type struct {
 	Pointer    bool
 	InnerType  *Type
 	Object     bool
+	Primitive  PrimitiveType
+}
+
+type PrimitiveType struct {
+	IsPrimitive     bool
+	WrapperTypeName string
 }
 
 type Field struct {
@@ -62,8 +64,12 @@ func (f Field) NotIsLastField(list []Field, i int) bool {
 	return i != len(list)-1
 }
 
-func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
+func (f Field) GetUpperCamelCaseName(prefix string, target string, isPrimitive bool) string {
 	n := prefix + strcase.ToCamel(f.Name)
+
+	if isPrimitive {
+		n += ".Value"
+	}
 
 	if target == "" {
 		return n
@@ -80,6 +86,12 @@ func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 	if formatter != nil {
 		n = formatter.format(f.Type, n)
 	}
+
+	return n
+}
+
+func (f Field) GetLowerCamelCaseName() string {
+	n := strcase.ToLowerCamel(f.Name)
 
 	return n
 }
@@ -119,7 +131,11 @@ func writeMap(f io.Writer, source *generator.CodeList) {
 	tpath := "templates/callmap.go.tmpl"
 	base := path.Base(tpath)
 
-	t, err := template.New(base).ParseFiles(tpath)
+	t, err := template.New(base).Funcs(template.FuncMap{
+		"format": func(format string, a ...interface{}) string {
+			return fmt.Sprintf(format, a...)
+		},
+	}).ParseFiles(tpath)
 	if err != nil {
 		log.Errorf("failed to write head with error %v", err)
 	}
@@ -198,20 +214,15 @@ func createFunction(pack string, function generator.FunctionData, protoPackageNa
 	params := createListOfFields(function.Params, pack)
 	size := len(params)
 
-	var sub *Subscription
-	if function.Subscription != nil && size > 0 {
-		sub = createSubscription(pack, params, function)
-
-		// trim last param (onEvent)
-		params = params[:size-1]
-	}
-
 	var returnType *ReturnType
-	if function.ReturnType != nil && size > 0 {
-		returnType = createReturnType(pack, params, function)
+	if function.ReturnType != nil {
+		returnType = createReturnType(pack, size, function)
 
+		// returnType.Name == "MyProtoCall"
 		// trim last param (onEvent)
-		params = params[:size-1]
+		if function.Subscription && size > 0 {
+			params = params[:size-1]
+		}
 	}
 	//function.ReturnType
 
@@ -220,40 +231,52 @@ func createFunction(pack string, function generator.FunctionData, protoPackageNa
 		Comments:         function.Comments,
 		ReturnType:       returnType,
 		Params:           params,
-		Subscription:     sub,
+		Subscription:     function.Subscription,
 		Package:          pack,
 		ProtoPackageName: protoPackageName,
 	}
 }
 
-func createReturnType(pack string, params []Field, function generator.FunctionData) *ReturnType {
-	return nil //TODO
-}
+func createReturnType(pack string, paramsNumber int, function generator.FunctionData) *ReturnType {
+	var typ *ReturnType
+	paramTypeName := ""
+	isPointer := false
+	//var returnParam *ast.Field
+	//var params []Field
 
-func createSubscription(pack string, params []Field, function generator.FunctionData) *Subscription {
-	var sub *Subscription
-	eventParam := function.Params.List[len(params)-1]
+	if function.Subscription {
+		returnParam := function.Params.List[paramsNumber-1]
 
-	if tName, ok := eventParam.Type.(*ast.FuncType); ok {
-		eventParams := tName.Params.List
-		paramTypeName := ""
+		if tName, ok := returnParam.Type.(*ast.FuncType); ok {
+			eventParams := tName.Params.List
 
-		if len(eventParams) > 0 && len(eventParams[0].Names) > 0 {
-			if paramType, ok := eventParams[0].Type.(*ast.Ident); ok {
-				paramTypeName = paramType.Name
+			if len(eventParams) > 0 && len(eventParams[0].Names) > 0 {
+				switch t := eventParams[0].Type.(type) {
+				case *ast.Ident:
+					paramTypeName = t.Name
+				case *ast.StarExpr:
+					isPointer = true
+					if tt, ok := t.X.(*ast.Ident); ok {
+						paramTypeName = tt.Name
+					}
+				}
 			}
-		}
 
-		params := createListOfFields(function.Subscription.Field, pack)
-
-		sub = &Subscription{
-			Name:      function.Subscription.Name,
-			EventName: paramTypeName,
-			Params:    params,
 		}
+	} else if function.ReturnType != nil && function.ReturnType.Field != nil {
+		paramTypeName = function.ReturnType.Name
 	}
 
-	return sub
+	params := createListOfFields(function.ReturnType.Field, pack)
+
+	typ = &ReturnType{
+		Name:      function.ReturnType.Name,
+		EventName: paramTypeName,
+		Params:    params,
+		IsPointer: isPointer,
+	}
+
+	return typ
 }
 
 func writeHeader(f io.Writer, sourceList *generator.CodeList) {
@@ -333,6 +356,7 @@ func createRichType(tp ast.Expr) Type {
 	Array := false
 	SimpleType := "interface{}"
 	Pointer := false
+	//isPod := true
 
 	var InnerType *Type
 
@@ -365,6 +389,7 @@ func createRichType(tp ast.Expr) Type {
 		Pointer:    Pointer,
 		InnerType:  InnerType,
 		Object:     object,
+		Primitive:  GetPrimitive(SimpleType),
 	}
 }
 
@@ -389,4 +414,44 @@ func createType(tp ast.Expr) string {
 
 func toTypeName(name string) string {
 	return name
+}
+
+func GetPrimitive(name string) PrimitiveType {
+	var isPrimitive bool
+	var wrapperTypeName string
+
+	switch name {
+	case "float32":
+		isPrimitive = true
+		wrapperTypeName = "FloatValue"
+	case "float64":
+		isPrimitive = true
+		wrapperTypeName = "DoubleValue"
+	case "int":
+		fallthrough
+	case "int8":
+		fallthrough
+	case "int16":
+		fallthrough
+	case "int32":
+		isPrimitive = true
+		wrapperTypeName = "Int32Value"
+	case "int64":
+		isPrimitive = true
+		wrapperTypeName = "Int64Value"
+	case "bool":
+		isPrimitive = true
+		wrapperTypeName = "BoolValue"
+	case "string":
+		isPrimitive = true
+		wrapperTypeName = "StringValue"
+	case "[]byte":
+		isPrimitive = true
+		wrapperTypeName = "BytesValue"
+	}
+
+	return PrimitiveType{
+		IsPrimitive:     isPrimitive,
+		WrapperTypeName: wrapperTypeName,
+	}
 }

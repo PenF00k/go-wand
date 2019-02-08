@@ -14,21 +14,11 @@ type Annotation struct {
 type FunctionData struct {
 	Name         string
 	Comments     []string
-	ReturnType   *ReturnTypeData
+	ReturnType   *ExportedStucture
 	Params       *ast.FieldList
-	Subscription *SubscriptionData
+	Subscription bool
 	Annotation   []Annotation
 	CallName     string
-}
-
-type ReturnTypeData struct {
-	Name       string
-	Field      *ast.FieldList
-}
-
-type SubscriptionData struct {
-	Name       string
-	Field      *ast.FieldList
 }
 
 type ExportedStucture struct {

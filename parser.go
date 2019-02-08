@@ -58,31 +58,8 @@ func Parse(codeList *generator.CodeList) error {
 	//codeList.Pure = make([]generator.FunctionData, 0, len(codeList.Functions)+8)
 	packageName := "unknown"
 
-	for name, pkg := range pkgs {
-		packageName = name
-
-		for name, file := range pkg.Files {
-			log.Printf("file %s", name)
-			cmap := ast.NewCommentMap(fset, file, file.Comments)
-			file.Comments = cmap.Comments()
-
-			ast.Inspect(file, func(n ast.Node) bool {
-				switch x := n.(type) {
-				case *ast.Package:
-					packageName = x.Name
-
-				case *ast.TypeSpec:
-					restoreCommentForType(&cmap, fset, x)
-					createType(codeList, x)
-
-				case *ast.FuncDecl:
-					createFuction(codeList, x)
-				}
-
-				return true
-			})
-		}
-	}
+	packageName = parseStructures(codeList, pkgs, fset)
+	packageName = parseFunctions(codeList, pkgs)
 
 	codeList.PackageName = packageName
 
@@ -102,6 +79,49 @@ func Parse(codeList *generator.CodeList) error {
 	}
 
 	return nil
+}
+
+func parseStructures(codeList *generator.CodeList, pkgs map[string]*ast.Package, fset *token.FileSet) (packageName string) {
+	for name, pkg := range pkgs {
+		packageName = name
+
+		for name, file := range pkg.Files {
+			log.Printf("file %s", name)
+			cmap := ast.NewCommentMap(fset, file, file.Comments)
+			file.Comments = cmap.Comments()
+
+			ast.Inspect(file, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.Package:
+					packageName = x.Name
+
+				case *ast.TypeSpec:
+					restoreCommentForType(&cmap, fset, x)
+					createType(codeList, x)
+				}
+
+				return true
+			})
+		}
+	}
+	return
+}
+
+func parseFunctions(codeList *generator.CodeList, pkgs map[string]*ast.Package) (packageName string) {
+	for name, pkg := range pkgs {
+		packageName = name
+
+		for _, file := range pkg.Files {
+			ast.Inspect(file, func(n ast.Node) bool {
+				if x, ok := n.(*ast.FuncDecl); ok {
+					createFunction(codeList, x)
+				}
+
+				return true
+			})
+		}
+	}
+	return
 }
 
 func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool {
@@ -126,13 +146,13 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 	return false
 }
 
-func createFunctionParameters(funcDecl *ast.FuncDecl) *generator.FunctionData {
+func createFunctionParameters(codeList *generator.CodeList, funcDecl *ast.FuncDecl) *generator.FunctionData {
 	comments := getComments(funcDecl.Doc)
-	subscription := getSubscriptionType(funcDecl.Type)
-	returnType := getCallbackType(funcDecl)
+	returnType, isSubscription := getReturnDataType(codeList, funcDecl.Type)
+	//returnType := getCallbackType(funcDecl)
 
 	return &generator.FunctionData{
-		Subscription: subscription,
+		Subscription: isSubscription,
 		Comments:     comments,
 		ReturnType:   returnType,
 		Name:         funcDecl.Name.Name,
@@ -141,7 +161,7 @@ func createFunctionParameters(funcDecl *ast.FuncDecl) *generator.FunctionData {
 	}
 }
 
-func getCallbackType(funcDecl *ast.FuncDecl) *generator.ReturnTypeData {
+func getCallbackType(funcDecl *ast.FuncDecl) *generator.ExportedStucture {
 	resultTypes := funcDecl.Type.Results
 
 	if resultTypes == nil {
@@ -163,7 +183,7 @@ func getCallbackType(funcDecl *ast.FuncDecl) *generator.ReturnTypeData {
 		}
 	}
 
-	return &generator.ReturnTypeData{
+	return &generator.ExportedStucture{
 		Name:  caster.GetFullGoTypeAsString(resultTypes.List[0].Type, ""),
 		Field: returnedTypeField,
 	}
@@ -217,15 +237,14 @@ func GetAnnotations(comments []string) ([]string, []generator.Annotation) {
 	return outList, annotations
 }
 
-func getSubscriptionType(funcTypes *ast.FuncType) *generator.SubscriptionData {
+func getReturnDataType(codeList *generator.CodeList, funcTypes *ast.FuncType) (returnType *generator.ExportedStucture, isSubscription bool) {
 	resultTypes := funcTypes.Results
 	paramTypes := funcTypes.Params
 
-	if resultTypes == nil {
-		return nil
+	if resultTypes == nil || resultTypes.List == nil || len(resultTypes.List) == 0 {
+		return
 	}
 
-	isSubscription := false
 	for _, t := range resultTypes.List {
 		if t != nil {
 			if selType, ok := t.Type.(*ast.SelectorExpr); ok {
@@ -239,11 +258,15 @@ func getSubscriptionType(funcTypes *ast.FuncType) *generator.SubscriptionData {
 		}
 	}
 
-	log.Infof("isSubscription %v", isSubscription)
-
 	if !isSubscription {
-		return nil
+		returnType = &generator.ExportedStucture{
+			Name:  caster.GetFullGoTypeAsString(resultTypes.List[0].Type, ""),
+			Field: createReturnTypeFieldsForFunction(resultTypes.List),
+		}
+		return
 	}
+
+	log.Infof("isSubscription %v", isSubscription)
 
 	for _, paramFields := range paramTypes.List {
 		if functionType, ok := paramFields.Type.(*ast.FuncType); ok {
@@ -251,19 +274,19 @@ func getSubscriptionType(funcTypes *ast.FuncType) *generator.SubscriptionData {
 				if n.Name == "onEvent" {
 					params := functionType.Params.List
 					if len(params) > 0 && len(params[0].Names) > 0 {
-						var subField *ast.FieldList
-						if funcArgType, ok := params[0].Type.(*ast.Ident); ok {
-							if funcArgType.Obj != nil {
-								if decl, ok := funcArgType.Obj.Decl.(*ast.TypeSpec); ok {
-									if str, ok := decl.Type.(*ast.StructType); ok {
-										subField = str.Fields
-									}
+						var fields *ast.FieldList
+						if subEventTypeName := createReturnTypeFieldsForSubscription(params); subEventTypeName != nil {
+							for _, s := range codeList.Structures {
+								if s.Name == *subEventTypeName {
+									fields = s.Field
+									break
 								}
 							}
 						}
-						return &generator.SubscriptionData{
+
+						returnType = &generator.ExportedStucture{
 							Name:  params[0].Names[0].Name,
-							Field: subField,
+							Field: fields,
 						}
 					}
 				}
@@ -271,15 +294,44 @@ func getSubscriptionType(funcTypes *ast.FuncType) *generator.SubscriptionData {
 		}
 	}
 
+	return
+}
+
+func createReturnTypeFieldsForSubscription(params []*ast.Field) *string {
+	switch t := params[0].Type.(type) {
+	case *ast.StarExpr:
+		if t, ok := t.X.(*ast.Ident); ok {
+			return &t.Name
+		}
+	}
 	return nil
 }
 
-func createFuction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
+func createReturnTypeFieldsForFunction(params []*ast.Field) (subField *ast.FieldList) {
+	switch t := params[0].Type.(type) {
+	case *ast.Ident:
+		if t.Obj != nil {
+			if decl, ok := t.Obj.Decl.(*ast.TypeSpec); ok {
+				if t, ok := decl.Type.(*ast.StructType); ok {
+					return t.Fields
+				}
+			}
+		}
+	case *ast.StarExpr:
+		if t, ok := t.X.(*ast.StructType); ok {
+			return t.Fields
+		}
+	}
+	return nil
+}
+
+func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 	if !funcDecl.Name.IsExported() {
 		return
 	}
 
-	codeList.AddFunction(*createFunctionParameters(funcDecl))
+	f := createFunctionParameters(codeList, funcDecl)
+	codeList.AddFunction(*f)
 }
 
 func createType(codeList *generator.CodeList, typeSpec *ast.TypeSpec) {

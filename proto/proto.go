@@ -116,9 +116,7 @@ func writeStructures(wr io.Writer, source *generator.CodeList) {
 
 func writeFunctionFieldStructures(wr io.Writer, source *generator.CodeList) {
 	for _, fn := range source.Functions {
-		if fn.Subscription != nil {
-			writeFunctionFieldStructure(wr, fn)
-		}
+		writeFunctionFieldStructure(wr, fn)
 	}
 }
 
@@ -285,12 +283,39 @@ func getFieldNumber(field *ast.Field, name string) (fieldNumber int) {
 	return
 }
 
+//func toProtoName(name string) string {
+//	switch name {
+//	case "float32":
+//		return "float"
+//	case "float64":
+//		return "double"
+//	case "int":
+//		fallthrough
+//	case "int8":
+//		fallthrough
+//	case "int16":
+//		fallthrough
+//	case "int32":
+//		return "int32"
+//	case "int64":
+//		return "int64"
+//	case "bool":
+//		return "bool"
+//	case "[]byte":
+//		return "bytes"
+//	case "Time":
+//		return "google.protobuf.Timestamp"
+//	}
+//
+//	return name
+//}
+
 func toProtoName(name string) string {
 	switch name {
 	case "float32":
-		return "float"
+		return "google.protobuf.FloatValue"
 	case "float64":
-		return "double"
+		return "google.protobuf.DoubleValue"
 	case "int":
 		fallthrough
 	case "int8":
@@ -298,13 +323,15 @@ func toProtoName(name string) string {
 	case "int16":
 		fallthrough
 	case "int32":
-		return "int32"
+		return "google.protobuf.Int32Value"
 	case "int64":
-		return "int64"
+		return "google.protobuf.Int64Value"
 	case "bool":
-		return "bool"
+		return "google.protobuf.BoolValue"
+	case "string":
+		return "google.protobuf.StringValue"
 	case "[]byte":
-		return "bytes"
+		return "google.protobuf.BytesValue"
 	case "Time":
 		return "google.protobuf.Timestamp"
 	}

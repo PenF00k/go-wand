@@ -169,11 +169,3 @@ func Subscribe(subscriptionName string, args []byte, callback FuncCallback) {
 func Unsubscribe(subscriptionName string) {
 	registry.CancelSubscription(subscriptionName)
 }
-
-func InitializeEx(lang string, storageBasePath string, server string, wsHost string, clientMode bool) {
-	client.InitializeEx(lang, storageBasePath, server, wsHost, clientMode)
-}
-
-func Destroy() {
-	client.Destroy()
-}

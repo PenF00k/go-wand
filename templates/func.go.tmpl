@@ -1,27 +1,46 @@
 {{ $Params := .Params }}
-{{ $Subscription := .Subscription }}
+{{ $ReturnType := .ReturnType }}
+
+{{ define "build1" }}
+    {{ range $item := .Params }}
+        {{ if $item.RichType.Primitive.IsPrimitive -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            Value: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{- else -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            {{ $item.GetUpperCamelCaseName "" "" false }}: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{ end }}
+        }
+    {{ end }}
+{{ end }}
+
+{{ define "build2" }}
+    {{- range $item := .Params }}
+        {{ $item.GetUpperCamelCaseName "" "" false }}: _{{ $item.GetLowerCamelCaseName }},
+    {{- end }}
+    }
+
+    bytes, err := proto.Marshal(&dataProto)
+{{ end }}
+
+{{ printf "// %+v\n" . }}
+
 {{- if .Subscription }}
-/**{{range $_, $item := .Comments}}
- * {{ $item }}{{end}}
- */
 func {{ .Name }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {
-   args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
+    args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
 
-   if err := proto.Unmarshal(argsBytes, &args); err != nil {
-      return nil, err
-   }
+    if err := proto.Unmarshal(argsBytes, &args); err != nil {
+        return nil, err
+    }
 
-   return {{ .Package }}.{{ .Name }}({{ range $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" }}, {{ end }}func(data {{ .Package }}.{{ .Subscription.EventName }}) {
-      dataProto := {{ .ProtoPackageName }}.{{ .Subscription.EventName }}{
-         {{- range $item := $Subscription.Params }}
-            {{ $item.GetUpperCamelCaseName "" "" }}: {{ $item.GetUpperCamelCaseName "data." "pro" }},
-         {{- end }}
-      }
+    return {{ .Package }}.{{ .Name }}({{ range $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" $item.RichType.Primitive.IsPrimitive }}, {{ end }}func(data *{{ .Package }}.{{ .ReturnType.EventName }}) {
+        {{ template "build1" $ReturnType }}
+    dataProto := {{ .ProtoPackageName }}.{{ $ReturnType.EventName }}{
+        {{ template "build2" $ReturnType }}
 
-      bytes, err := proto.Marshal(&dataProto)
-      if err == nil {
-         callback.OnEvent(bytes)
-      }
+    if err == nil {
+        callback.OnEvent(bytes)
+    }
    })
 }
 
@@ -34,14 +53,14 @@ func getEventName{{ .Name }}(argsBytes []byte) (string, error) {
 
 	fullName := "{{ .Name }}" + fmt.Sprintf("
     {{- range $item := $Params }}:%v{{ end -}}
-    ", {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "" -}}
-        {{- if .NotIsLastField $Params $i }}, {{- end -}}
+    ", {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "" $item.RichType.Primitive.IsPrimitive -}}
+        {{- if .NotIsLastField $Params $i }}, {{ end -}}
     {{- end -}})
 
 	return fullName, nil
 }
-{{ else }}
-func {{ .Name }}(argsBytes []byte, callback goapi.FuncCallback) {
+{{ else if $ReturnType }}
+func callAdapterFor{{ .Name }}(argsBytes []byte, callback goapi.FuncCallback) {
     args := {{ .ProtoPackageName }}.{{ .Name }}Args{}
 
 	if err := proto.Unmarshal(argsBytes, &args); err != nil {
@@ -50,15 +69,15 @@ func {{ .Name }}(argsBytes []byte, callback goapi.FuncCallback) {
 	}
 
 	res, err := {{ .Package }}.{{ .Name }}(
-    {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" -}}
+    {{- range $i, $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" false -}}
         {{- if .NotIsLastField $Params $i }}, {{- end -}}
     {{- end }})
 	if err != nil {
 		callback.OnError(err.Error())
 	} else {
-        dataProto := {{ .ProtoPackageName }}.{{ .ReturnType }}{
-            {{- range $item := $Params }}
-                {{ $item.GetUpperCamelCaseName "" "" }}: {{ $item.GetUpperCamelCaseName "res." "pro" }},
+        dataProto := {{ .ProtoPackageName }}.{{ $ReturnType.EventName }}{
+            {{- range $item := $ReturnType.Params }}
+                {{ $item.GetUpperCamelCaseName "" "" false }}: {{ $item.GetUpperCamelCaseName "res." "pro" false }},
             {{- end }}
         }
 
@@ -69,5 +88,9 @@ func {{ .Name }}(argsBytes []byte, callback goapi.FuncCallback) {
             callback.OnError(err.Error())
         }
 	}
+}
+{{ else }}
+func {{ .Name }}({{range $index, $item := $Params}}{{if $index}}, {{end}}{{ $item.Name }} {{if $item.RichType.Object }}{{ $item.Package}}.{{end}}{{ $item.Type }}{{end}})  {
+   {{ .Package }}.{{ .Name }}({{range $index, $item := $Params}}{{if $index}}, {{end}}{{ $item.Name }}{{end}})
 }
 {{ end }}
