@@ -6,16 +6,49 @@ import (
 )
 
 type TemplateStructData struct {
-	Types []TemplateProtoTypeData
+	MessageName string
+	Types       []TemplateProtoTypeData
 }
 
 type TemplateProtoTypeData struct {
-	TypeName    adapter.TypeName
+	Type        adapter.Type
 	Name        string
 	FieldNumber int
 }
 
 //{{ $item.TypeName }} {{ $item.Name }} = {{ $item.FieldNumber }};
-func (gen CodeGenerator) GetFieldString(data TemplateProtoTypeData) string {
-	return fmt.Sprintf("%v %v = %v;", data.TypeName, data.Name, data.FieldNumber)
+func (d TemplateProtoTypeData) GetFieldString() string {
+	return getFieldStringInner(d.Type, d.Name, d.FieldNumber)
+	//return fmt.Sprintf("%v %v = %v;", tn, d.Name, d.FieldNumber)
+}
+
+func getFieldStringInner(typ adapter.Type, name string, fieldNumber int) string {
+	var typeName string
+	if typ.Pointer != nil {
+		if !typ.Pointer.InnerType.IsPrimitive {
+			return getFieldStringInner(typ.Pointer.InnerType, name, fieldNumber)
+		}
+
+		typeName = toProtoName(string(typ.Pointer.InnerType.Name), true)
+	} else {
+		typeName = toProtoName(string(typ.Name), false)
+	}
+
+	if typ.Slice != nil {
+		return "repeated " + getFieldStringInner(typ.Slice.InnerType, name, fieldNumber)
+	}
+
+	if typ.Selector != nil {
+		typeName = toProtoName(fmt.Sprintf("%v.%v", typ.Selector.Package, typ.Selector.TypeName), false)
+	}
+
+	return fmt.Sprintf("%v %v = %v;", typeName, name, fieldNumber)
+}
+
+func toProtoName(name string, isPointer bool) string {
+	if isPointer {
+		return PointerFormatter.format(name)
+	} else {
+		return BasicFormatter.format(name)
+	}
 }

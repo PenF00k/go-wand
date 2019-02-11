@@ -48,8 +48,22 @@ func adoptFunctions(codeList *generator.CodeList) []adapter.Function {
 }
 
 func adoptSourceFunction(codeList *generator.CodeList, functionData generator.FunctionData) adapter.Function {
-	args := adoptFields(codeList, functionData.Args, "todo")                 //TODO pack?
-	returnValues := adoptFields(codeList, functionData.ReturnValues, "todo") //TODO pack?
+	sourceArgs := functionData.Args
+	sourceReturnValues := functionData.ReturnValues
+
+	if functionData.IsSubscription {
+		// remove last arg, it's event function
+		size := len(sourceArgs.List) - 1
+		sFields := make([]*ast.Field, size)
+		copy(sFields, functionData.Args.List[:size])
+		sourceArgs.List = sFields
+
+		// remove result values, no need in subscription
+		sourceReturnValues = nil
+	}
+
+	args := adoptFields(codeList, sourceArgs, "todo")                 //TODO pack?
+	returnValues := adoptFields(codeList, sourceReturnValues, "todo") //TODO pack?
 
 	return adapter.Function{
 		FunctionName:   functionData.Name,
@@ -93,7 +107,7 @@ func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) adapter.T
 	var Struct *adapter.Struct
 	var Function *adapter.Function
 	var IsPrimitive bool
-	var Package *string
+	var Selector *adapter.Selector
 
 Loop:
 	switch x := tp.(type) {
@@ -132,7 +146,12 @@ Loop:
 		IsPrimitive = true
 
 	case *ast.SelectorExpr:
-		Package = &x.Sel.Name //TODO а так ли это?? или pack возьмем?
+		n := adoptType(codeList, x.X, pack).Name
+		Selector = &adapter.Selector{
+			Package:  string(n),
+			TypeName: adapter.TypeName(x.Sel.Name),
+		}
+		//Package = &x.Sel.Name //TODO а так ли это?? или pack возьмем?
 	}
 
 	return adapter.Type{
@@ -143,7 +162,7 @@ Loop:
 		Struct:      Struct,
 		Function:    Function,
 		IsPrimitive: IsPrimitive,
-		Package:     Package,
+		Selector:    Selector,
 	}
 }
 

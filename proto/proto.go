@@ -96,14 +96,15 @@ func createFunctionArgs(functionData adapter.Function) TemplateStructData {
 		types = append(types, typ)
 	}
 	return TemplateStructData{
-		Types: types,
+		MessageName: functionData.FunctionName + "Args",
+		Types:       types,
 	}
 }
 
 func createFunctionArg(functionData adapter.Field, n int) TemplateProtoTypeData {
 	return TemplateProtoTypeData{
-		Name:        functionData.Name + "Args",
-		TypeName:    functionData.Type.Name,
+		Name:        functionData.Name,
+		Type:        functionData.Type,
 		FieldNumber: n,
 	}
 }
@@ -124,9 +125,41 @@ func writeStructure(wr io.Writer, structType adapter.Struct) {
 		return
 	}
 
-	err = t.Execute(wr, structType)
+	s := createStructure(structType)
+	err = t.Execute(wr, s)
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
+	}
+}
+
+func createStructure(structData adapter.Struct) TemplateStructData {
+	types := make([]TemplateProtoTypeData, 0, len(structData.Fields))
+
+	for i, v := range structData.Fields {
+		typ := createStructureField(v, i+1)
+		types = append(types, typ)
+	}
+	return TemplateStructData{
+		MessageName: string(structData.Name),
+		Types:       types,
+	}
+}
+
+func createStructureField(fieldData adapter.Field, n int) TemplateProtoTypeData {
+	typ := fieldData.Type
+	for typ.Pointer != nil {
+		it := typ.Pointer.InnerType
+		if it.IsPrimitive {
+			break
+		} else {
+			typ = typ.Pointer.InnerType
+		}
+	}
+
+	return TemplateProtoTypeData{
+		Name:        fieldData.Name,
+		Type:        typ,
+		FieldNumber: n,
 	}
 }
 

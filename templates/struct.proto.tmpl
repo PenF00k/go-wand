@@ -1,6 +1,6 @@
-message {{ .Adapter.Name }} {
-{{- range $_, $item := .Adapter.Field }}
-    (( .GetFieldString $item }}
+message {{ .MessageName }} {
+{{- range $_, $item := .Types }}
+    {{ .GetFieldString }}
 {{- end }}
 }
 

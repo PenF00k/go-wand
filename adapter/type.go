@@ -18,7 +18,7 @@ type Type struct {
 	Struct      *Struct
 	Function    *Function
 	IsPrimitive bool
-	Package     *string
+	Selector    *Selector
 }
 
 type Pointer struct {
@@ -68,4 +68,9 @@ type Primitive struct {
 
 type Subscription struct {
 	Field Field
+}
+
+type Selector struct {
+	Package  string
+	TypeName TypeName
 }
