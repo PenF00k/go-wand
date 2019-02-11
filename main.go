@@ -1,6 +1,9 @@
 package main
 
 import (
+	"gitlab.vmassive.ru/wand/generator"
+	"gitlab.vmassive.ru/wand/parser"
+	"gitlab.vmassive.ru/wand/util"
 	"go/build"
 	"os"
 	"os/signal"
@@ -10,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"gitlab.vmassive.ru/wand/config"
-	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/reload"
 
 	"github.com/fsnotify/fsnotify"
@@ -96,36 +98,40 @@ func runApplication(configName string, dev bool) {
 		ProtoRel: protoRelPath,
 	}
 
+	packageMap := generator.PackageMap{
+		ProtoPackageName: "proto_client",
+	}
+
 	goPackageName := configuration.Wrapper.Package
 	if dev {
 		goPackageName = "main"
 	}
 
 	codeList := &generator.CodeList{
-		Package:          goPackageName,
-		ProtoPackageName: "proto_client",
-		Dev:              dev,
-		Port:             configuration.Wrapper.Port,
-		SourcePackage:    configuration.Source.Package,
-		PathMap:          pathMap,
-		Config:           configuration,
+		Package:       goPackageName,
+		Dev:           dev,
+		Port:          configuration.Wrapper.Port,
+		SourcePackage: configuration.Source.Package,
+		Config:        configuration,
+		PathMap:       pathMap,
+		PackageMap:    packageMap,
 	}
 
 	if dev {
 		watchGo(codeList)
 	} else {
-		Parse(codeList)
+		parser.Parse(codeList)
 	}
 }
 
 func watchGo(codeList *generator.CodeList) {
-	Parse(codeList)
+	parser.Parse(codeList)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer watcher.Close()
+	defer util.CloseWatcher(watcher)
 
 	rel, err := reload.New(codeList)
 	if err != nil {
@@ -156,7 +162,7 @@ func watchGo(codeList *generator.CodeList) {
 					event.Op&fsnotify.Rename == fsnotify.Rename ||
 					event.Op&fsnotify.Create == fsnotify.Create {
 					log.Println("modified file:", event.Name)
-					Parse(codeList)
+					parser.Parse(codeList)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
