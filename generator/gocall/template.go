@@ -1,4 +1,4 @@
-package proto
+package gocall
 
 import (
 	"fmt"
@@ -46,9 +46,12 @@ func getFieldStringInner(typ adapter.Type, name string, fieldNumber int) string 
 }
 
 func toProtoName(name string, isPointer bool) string {
-	if isPointer {
-		return PointerFormatter.format(name)
-	} else {
-		return BasicFormatter.format(name)
-	}
+	//var f protoFormatter
+	//if isPointer {
+	//	f = ProtoFormatter
+	//} else {
+	//	f = BasicFormatter
+	//}
+
+	return name
 }

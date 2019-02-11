@@ -97,16 +97,16 @@ func (f Field) GetLowerCamelCaseName() string {
 type GoCodeGenerator struct {
 	outDirectory string
 	packageName  string
-	adapter      *adapter.Adapter
-	codeList     *generator.CodeList
+	Adapter      *adapter.Adapter
+	CodeList     *generator.CodeList
 }
 
 func New(outDirectory string, packageName string, adapter *adapter.Adapter, codeList *generator.CodeList) generator.Generator {
 	return &GoCodeGenerator{
 		outDirectory: outDirectory,
 		packageName:  packageName,
-		adapter:      adapter,
-		codeList:     codeList,
+		Adapter:      adapter,
+		CodeList:     codeList,
 	}
 }
 
@@ -116,7 +116,7 @@ func (gen GoCodeGenerator) CreateCode() error {
 		return err
 	}
 
-	if !gen.codeList.Dev {
+	if !gen.CodeList.Dev {
 		cmd := exec.Command("go", "fmt")
 		cmd.Dir = gen.outDirectory
 
@@ -182,8 +182,8 @@ func (gen GoCodeGenerator) writeMap(f io.Writer) {
 	}
 }
 func (gen GoCodeGenerator) writeFunctions(wr io.Writer) {
-	for _, function := range gen.adapter.Functions {
-		writeFunction(wr, gen.packageName, function, gen.codeList.PackageMap.ProtoPackageName)
+	for _, function := range gen.Adapter.Functions {
+		writeFunction(wr, gen.packageName, function, gen.CodeList.PackageMap.ProtoPackageName)
 	}
 }
 

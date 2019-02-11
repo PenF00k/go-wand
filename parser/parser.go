@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/generator/gocall"
-	"gitlab.vmassive.ru/wand/proto"
+	"gitlab.vmassive.ru/wand/generator/proto"
 	"go/ast"
 	"go/parser"
 	"go/token"
