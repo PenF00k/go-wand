@@ -2,12 +2,87 @@ package gocall
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"gitlab.vmassive.ru/wand/adapter"
+	"gitlab.vmassive.ru/wand/generator"
 )
 
 type TemplateStructData struct {
-	Objects []ObjectType
+	Fields     []adapter.Field
+	FlatFields []adapter.Type
+	Adapter    *adapter.Adapter
+	CodeList   *generator.CodeList
+	Function   adapter.Function
+	Package    string
 	//Types   []TemplateProtoTypeData
+}
+
+func (t TemplateStructData) GetEventTypeName() string {
+	var name string
+	var star string
+	rvt := t.Function.ReturnValues[0].Type
+	//t.Function.ReturnValues[0].Type.Pointer.InnerType.Name
+	if rvt.Pointer != nil {
+		name = string(rvt.Pointer.InnerType.Name)
+		star = "*"
+	} else {
+		name  = string(rvt.Name)
+		star = ""
+	}
+	return fmt.Sprintf("%v%v.%v", star, t.Package, name)
+}
+
+//func (t TemplateStructData) GetEventTypeName() string {
+//	return fmt.Sprintf("return %v.%v(", t.Package, t.Function.ReturnValues[0].Type.Name)
+//	   return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" $item.Type.IsPrimitive }}, {{ end }}func(data *{{ .Package }}.{{ .GetEventTypeName }}) {
+//}
+
+func flattenFieldsResult(returnedFields []adapter.Field) []adapter.Type {
+	flatten := make([]adapter.Type, 0, 10)
+	unique := make(map[interface{}]bool)
+
+	if len(returnedFields) > 0 {
+		flattenType(returnedFields[0].Type, &unique, &flatten)
+	}
+
+	return flatten
+}
+
+func flattenType(typ adapter.Type, unique *map[interface{}]bool, flatten *[]adapter.Type) *[]adapter.Type {
+	if _, ok := (*unique)[typ]; ok {
+		return flatten
+	}
+	(*unique)[typ] = true
+
+	if typ.IsPrimitive || typ.IsPrimitivePointer() {
+		//TODO просто добавляем
+	} else if typ.Pointer != nil {
+		flattenType(typ.Pointer.InnerType, unique, flatten)
+	} else if typ.Struct != nil {
+		flattenStructType(typ.Struct.Fields, unique, flatten)
+	} else if typ.Slice != nil {
+		flattenType(typ.Slice.InnerType, unique, flatten)
+	} else {
+		log.Warnf("unwanted type %+v", typ)
+	}
+
+	*flatten = append(*flatten, typ)
+
+	return flatten
+}
+
+func flattenStructType(args []adapter.Field, unique *map[interface{}]bool, flatten *[]adapter.Type) *[]adapter.Type {
+	var f *[]adapter.Type
+	for _, v := range args {
+		if _, ok := (*unique)[v]; ok {
+			continue
+		}
+		(*unique)[v] = true
+
+		f = flattenType(v.Type, unique, flatten)
+	}
+
+	return f
 }
 
 type ObjectType struct {

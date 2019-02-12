@@ -1,5 +1,7 @@
 package adapter
 
+import "github.com/iancoleman/strcase"
+
 type TypeName string
 type StructName string
 type FunctionName string
@@ -19,6 +21,10 @@ type Type struct {
 	Function    *Function
 	IsPrimitive bool
 	Selector    *Selector
+}
+
+func (t Type) IsPrimitivePointer() bool {
+	return t.Pointer != nil && t.Pointer.InnerType.IsPrimitive
 }
 
 type Pointer struct {
@@ -45,6 +51,42 @@ type Field struct {
 	Name string
 	//TypeName TypeName
 	Type Type
+}
+
+func (f Field) NotIsLastField(list []Field, i int) bool {
+	return i != len(list)-1
+}
+
+func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
+	n := prefix + strcase.ToCamel(f.Name)
+
+	if f.Type.IsPrimitivePointer() {
+		n += ".Value"
+	}
+
+	if target == "" {
+		return n
+	}
+
+	var formatter fieldFormatter
+	switch target {
+	case "pro":
+		formatter = ProtoFormatter
+	case "go":
+		formatter = GoFormatter
+	}
+
+	if formatter != nil {
+		n = formatter.format(string(f.Type.Name), n)
+	}
+
+	return n
+}
+
+func (f Field) GetLowerCamelCaseName() string {
+	n := strcase.ToLowerCamel(f.Name)
+
+	return n
 }
 
 type Annotation struct {

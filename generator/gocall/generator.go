@@ -2,7 +2,6 @@ package gocall
 
 import (
 	"fmt"
-	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
 	"gitlab.vmassive.ru/wand/adapter"
 	"gitlab.vmassive.ru/wand/generator"
@@ -14,89 +13,45 @@ import (
 	"path"
 )
 
-type Function struct {
-	Name             string
-	Comments         []string
-	ReturnType       *ReturnType
-	Params           []Field
-	Subscription     bool
-	Package          string
-	ProtoPackageName string
-}
-
-type ReturnType struct {
-	Name      string
-	EventName string
-	Params    []Field
-	IsPointer bool
-}
-
-type Type struct {
-	Name       string
-	Map        bool
-	Array      bool
-	SimpleType string
-	Pointer    bool
-	InnerType  *Type
-	Object     bool
-	Primitive  PrimitiveType
-}
-
-type PrimitiveType struct {
-	IsPrimitive     bool
-	WrapperTypeName string
-}
-
-type Field struct {
-	Name           string
-	Type           string
-	Comment        []string
-	RichType       Type
-	Array          bool
-	SimpleType     string
-	Package        string
-	FunctionParams []Field
-}
-
-func (f Field) NotIsLastField(list []Field, i int) bool {
-	return i != len(list)-1
-}
-
-func (f Field) GetUpperCamelCaseName(prefix string, target string, isPrimitive bool) string {
-	n := prefix + strcase.ToCamel(f.Name)
-
-	if isPrimitive {
-		n += ".Value"
-	}
-
-	if target == "" {
-		return n
-	}
-
-	var formatter fieldFormatter
-	switch target {
-	case "pro":
-		formatter = ProtoFormatter
-	case "go":
-		formatter = GoFormatter
-	}
-
-	if formatter != nil {
-		n = formatter.format(f.Type, n)
-	}
-
-	return n
-}
-
-func (f Field) GetLowerCamelCaseName() string {
-	n := strcase.ToLowerCamel(f.Name)
-
-	return n
-}
+//func (f Field) NotIsLastField(list []Field, i int) bool {
+//	return i != len(list)-1
+//}
+//
+//func (f Field) GetUpperCamelCaseName(prefix string, target string, isPrimitive bool) string {
+//	n := prefix + strcase.ToCamel(f.Name)
+//
+//	if isPrimitive {
+//		n += ".Value"
+//	}
+//
+//	if target == "" {
+//		return n
+//	}
+//
+//	var formatter fieldFormatter
+//	switch target {
+//	case "pro":
+//		formatter = ProtoFormatter
+//	case "go":
+//		formatter = GoFormatter
+//	}
+//
+//	if formatter != nil {
+//		n = formatter.format(f.Type, n)
+//	}
+//
+//	return n
+//}
+//
+//func (f Field) GetLowerCamelCaseName() string {
+//	n := strcase.ToLowerCamel(f.Name)
+//
+//	return n
+//}
 
 type GoCodeGenerator struct {
 	outDirectory string
-	packageName  string
+	Package      string
 	Adapter      *adapter.Adapter
 	CodeList     *generator.CodeList
 }
@@ -104,7 +59,7 @@ type GoCodeGenerator struct {
 func New(outDirectory string, packageName string, adapter *adapter.Adapter, codeList *generator.CodeList) generator.Generator {
 	return &GoCodeGenerator{
 		outDirectory: outDirectory,
-		packageName:  packageName,
+		Package:      packageName,
 		Adapter:      adapter,
 		CodeList:     codeList,
 	}
@@ -183,30 +138,43 @@ func (gen GoCodeGenerator) writeMap(f io.Writer) {
 }
 func (gen GoCodeGenerator) writeFunctions(wr io.Writer) {
 	for _, function := range gen.Adapter.Functions {
-		writeFunction(wr, gen.packageName, function, gen.CodeList.PackageMap.ProtoPackageName)
+		gen.writeFunction(wr, gen.Package, function, gen.CodeList.PackageMap.ProtoPackageName)
 	}
 }
 
-func writeFunction(wr io.Writer, pack string, function adapter.Function, protoPackageName string) {
+func (gen GoCodeGenerator) writeFunction(wr io.Writer, pack string, function adapter.Function, protoPackageName string) {
 	tpath := "templates/func.go.tmpl"
 	base := path.Base(tpath)
 
 	t, err := template.New(base).ParseFiles(tpath)
 	if err != nil {
 		log.Errorf("failed with error %v", err)
-		return
+		//return
 	}
 
-	f := createFunction(function)
+	f := gen.createFunction(function)
 	err = t.Execute(wr, f)
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
 	}
 }
 
-func createFunction(function adapter.Function) TemplateStructData {
+func (gen GoCodeGenerator) createFunction(function adapter.Function) TemplateStructData {
+	var flatten []adapter.Type
+
+	if function.IsSubscription {
+		flatten = flattenFieldsResult(function.ReturnValues)
+	} else {
+		flatten = flattenFieldsResult(function.ReturnValues)
+	}
+
 	return TemplateStructData{
-		Objects: BuildObjects(function),
+		Fields:     function.Args,
+		FlatFields: flatten,
+		Adapter:    gen.Adapter,
+		CodeList:   gen.CodeList,
+		Function:   function,
+		Package:    gen.Package,
 	}
 }
 

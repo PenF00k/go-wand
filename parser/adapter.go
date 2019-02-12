@@ -50,20 +50,28 @@ func adoptFunctions(codeList *generator.CodeList) []adapter.Function {
 func adoptSourceFunction(codeList *generator.CodeList, functionData generator.FunctionData) adapter.Function {
 	sourceArgs := functionData.Args
 	sourceReturnValues := functionData.ReturnValues
+	var returnValues []adapter.Field
 
 	if functionData.IsSubscription {
 		// remove last arg, it's event function
-		size := len(sourceArgs.List) - 1
-		sFields := make([]*ast.Field, size)
-		copy(sFields, functionData.Args.List[:size])
+		newSize := len(sourceArgs.List) - 1
+		last := sourceArgs.List[newSize]
+		sFields := make([]*ast.Field, newSize)
+		copy(sFields, sourceArgs.List[:newSize])
 		sourceArgs.List = sFields
 
-		// remove result values, no need in subscription
-		sourceReturnValues = nil
+		// replace result values
+		rFields := make([]*ast.Field, 1)
+		rFields[0] = last
+		sourceReturnValues.List = rFields
+
+		returnValuesTmp := adoptFields(codeList, sourceReturnValues, "todo") //TODO pack?
+		returnValues = []adapter.Field{returnValuesTmp[0].Type.Function.Args[0]}
+	} else {
+		returnValues = adoptFields(codeList, sourceReturnValues, "todo")
 	}
 
-	args := adoptFields(codeList, sourceArgs, "todo")                 //TODO pack?
-	returnValues := adoptFields(codeList, sourceReturnValues, "todo") //TODO pack?
+	args := adoptFields(codeList, sourceArgs, "todo") //TODO pack?
 
 	return adapter.Function{
 		FunctionName:   functionData.Name,
@@ -85,12 +93,19 @@ func adoptFields(codeList *generator.CodeList, list *ast.FieldList, pack string)
 	for _, f := range list.List {
 		_type := adoptType(codeList, f.Type, pack)
 
-		for _, n := range f.Names {
+		if len(f.Names) > 0 {
+			for _, n := range f.Names {
+				field := adapter.Field{
+					Name: n.Name,
+					Type: _type,
+				}
+
+				fields = append(fields, field)
+			}
+		} else {
 			field := adapter.Field{
-				Name: n.Name,
 				Type: _type,
 			}
-
 			fields = append(fields, field)
 		}
 	}
