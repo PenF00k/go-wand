@@ -187,6 +187,29 @@ func (gen GoCodeGenerator) writeFunctions(wr io.Writer) {
 	}
 }
 
+func writeFunction(wr io.Writer, pack string, function adapter.Function, protoPackageName string) {
+	tpath := "templates/func.go.tmpl"
+	base := path.Base(tpath)
+
+	t, err := template.New(base).ParseFiles(tpath)
+	if err != nil {
+		log.Errorf("failed with error %v", err)
+		return
+	}
+
+	f := createFunction(function)
+	err = t.Execute(wr, f)
+	if err != nil {
+		log.Errorf("template failed with error %v", err)
+	}
+}
+
+func createFunction(function adapter.Function) TemplateStructData {
+	return TemplateStructData{
+		Objects: BuildObjects(function),
+	}
+}
+
 //func writePureFunctions(wr io.Writer, pack string, source *generator.CodeList) {
 //	for _, function := range source.Pure {
 //		writePureFunction(wr, pack, function)
@@ -208,20 +231,3 @@ func (gen GoCodeGenerator) writeFunctions(wr io.Writer) {
 //		log.Errorf("template failed with error %v", err)
 //	}
 //}
-
-func writeFunction(wr io.Writer, pack string, function adapter.Function, protoPackageName string) {
-	tpath := "templates/func.go.tmpl"
-	base := path.Base(tpath)
-
-	t, err := template.New(base).ParseFiles(tpath)
-	if err != nil {
-		log.Errorf("failed with error %v", err)
-		return
-	}
-
-	//f := createFunction(pack, function, protoPackageName)
-	err = t.Execute(wr, function)
-	if err != nil {
-		log.Errorf("template failed with error %v", err)
-	}
-}

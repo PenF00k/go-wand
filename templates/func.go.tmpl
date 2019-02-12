@@ -1,6 +1,28 @@
 {{ $Params := .Params }}
 {{ $ReturnType := .ReturnType }}
 
+{{ define "array_builder" }}
+    arr := data.{{ .FieldName }}
+    {{ .FieldNameLowerCase }}s := make([]{{ .TypeName }}, len(arr))
+    for i, v := range arr {
+        {{ if true }}
+        {{ end }}
+
+        {{ .FieldNameLowerCase }}s[i] = v
+    }
+
+    {{ range $item := .Params }}
+        {{ if $item.RichType.Primitive.IsPrimitive -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            Value: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{- else -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            {{ $item.GetUpperCamelCaseName "" "" false }}: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{ end }}
+        }
+    {{ end }}
+{{ end }}
+
 {{ define "build1" }}
     {{ range $item := .Params }}
         {{ if $item.RichType.Primitive.IsPrimitive -}}
@@ -34,7 +56,20 @@ func {{ .Name }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscrip
     }
 
     return {{ .Package }}.{{ .Name }}({{ range $item := $Params }}{{ $item.GetUpperCamelCaseName "args." "go" $item.RichType.Primitive.IsPrimitive }}, {{ end }}func(data *{{ .Package }}.{{ .ReturnType.EventName }}) {
-        {{ template "build1" $ReturnType }}
+    {{ range $item := .Params }}
+        {{ .GetFieldString }}
+
+
+
+        {{ if $item.RichType.Primitive.IsPrimitive -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            Value: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{- else -}}
+            _{{ $item.GetLowerCamelCaseName }} := {{ if $item.RichType.Primitive.IsPrimitive }}&wrappers.{{ end }}{{ $item.RichType.Primitive.WrapperTypeName }}{
+            {{ $item.GetUpperCamelCaseName "" "" false }}: {{ $item.GetUpperCamelCaseName "data." "pro" false }},
+        {{ end }}
+        }
+    {{ end }}
     dataProto := {{ .ProtoPackageName }}.{{ $ReturnType.EventName }}{
         {{ template "build2" $ReturnType }}
 
