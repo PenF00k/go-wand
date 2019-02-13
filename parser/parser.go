@@ -243,11 +243,14 @@ func createFunctionData(funcDecl *ast.FuncDecl) generator.FunctionData {
 	comments := getComments(funcDecl.Doc)
 	isSubscription := checkIsSubscription(funcDecl.Type)
 	isPure := funcDecl.Type.Results.List == nil || len(funcDecl.Type.Results.List) == 0
+	name := funcDecl.Name.Name
+	args := funcDecl.Type.Params
+	returnValues := funcDecl.Type.Results
 
 	return generator.FunctionData{
-		Name:           funcDecl.Name.Name,
-		Args:           funcDecl.Type.Params,
-		ReturnValues:   funcDecl.Type.Results,
+		Name:           name,
+		Args:           args,
+		ReturnValues:   returnValues,
 		IsSubscription: isSubscription,
 		IsPure:         isPure,
 		Comments:       comments,

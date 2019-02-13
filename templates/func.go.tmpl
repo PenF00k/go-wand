@@ -1,6 +1,6 @@
-{{ $Args := .Function.Args }}
-{{ $ProtoPackageName := .CodeList.PackageMap.ProtoPackageName }}
-{{ define "gen_field" }}
+{{- $Args := .Function.Args -}}
+{{- $ProtoPackageName := .CodeList.PackageMap.ProtoPackageName -}}
+{{- define "gen_field" }}
     {{ if .IsPrimitive -}}
         {{- template "gen_primitive" . -}}
     {{- else if .IsPrimitivePointer -}}
@@ -12,15 +12,15 @@
     {{- else if .Pointer -}}
         {{- template "gen_pointer" . -}}
     {{- end -}}
-{{ end }}
+{{ end -}}
 
-{{ define "gen_primitive" }}
+{{- define "gen_primitive" }}
     gen{{ .GetGenFuncName }} := func(data {{ .Name }}) {{ .GetWrapperName true }} {
         return {{ .WrapToProtoType "data" }}
     }
-{{ end }}
+{{ end -}}
 
-{{ define "gen_wrapped_primitive" }}
+{{- define "gen_wrapped_primitive" }}
     gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName "" }}) {{ .GetWrapperName true }} {
         if data == nil {
             return nil
@@ -30,9 +30,9 @@
             Value: {{ .WrapToProtoType "*data" }},
         }
     }
-{{ end }}
+{{ end -}}
 
-{{ define "gen_struct" }}
+{{- define "gen_struct" }}
     {{- $UpperCaseName := .Name.ToUpperCamelCase -}}
     {{- $Package := "client" -}}
     {{ $ProtoPackageName := "proto_client" -}}
@@ -48,9 +48,9 @@
 
         return res
     }
-{{ end }}
+{{ end -}}
 
-{{ define "gen_slice" }}
+{{- define "gen_slice" }}
     {{- $Package := "client" -}}
     {{- $ProtoPackageName := "proto_client" -}}
 
@@ -70,9 +70,9 @@
 
         return res
     }
-{{ end }}
+{{ end -}}
 
-{{ define "gen_pointer" }}
+{{- define "gen_pointer" }}
     {{- $Package := "client" -}}
     {{- $ProtoPackageName := "proto_client" -}}
 
@@ -84,7 +84,7 @@
         res := gen{{ .Pointer.InnerType.GetGenFuncName }}(*data)
         return res
     }
-{{ end }}
+{{ end -}}
 
 {{- if .Function.IsSubscription }}
 func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {

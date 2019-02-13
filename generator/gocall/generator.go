@@ -162,11 +162,12 @@ func (gen GoCodeGenerator) writeFunction(wr io.Writer, pack string, function ada
 func (gen GoCodeGenerator) createFunction(function adapter.Function) TemplateStructData {
 	var flatten []*adapter.Type
 
-	if function.IsSubscription {
-		flatten = flattenFieldsResult(function.ReturnValues)
-	} else {
-		flatten = flattenFieldsResult(function.ReturnValues)
-	}
+	//if function.IsSubscription {
+	//	flatten = flattenFieldsResult(function.ReturnValues)
+	//} else {
+	//	flatten = flattenFieldsResult(function.ReturnValues)
+	//}
+	flatten = flattenFieldsResult(function.ReturnValues)
 
 	return TemplateStructData{
 		Fields:     function.Args,
