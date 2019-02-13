@@ -1,3 +1,19 @@
+{{ $Args := .Function.Args }}
+{{ $ProtoPackageName := .CodeList.PackageMap.ProtoPackageName }}
+{{ define "gen_field" }}
+    {{ if .IsPrimitive -}}
+        {{- template "gen_primitive" . -}}
+    {{- else if .IsPrimitivePointer -}}
+        {{- template "gen_wrapped_primitive" . -}}
+    {{- else if .Struct -}}
+        {{- template "gen_struct" . -}}
+    {{- else if .Slice -}}
+        {{- template "gen_slice" . -}}
+    {{- else if .Pointer -}}
+        {{- template "gen_pointer" . -}}
+    {{- end -}}
+{{ end }}
+
 {{ define "gen_primitive" }}
     gen{{ .GetGenFuncName }} := func(data {{ .Name }}) {{ .GetWrapperName true }} {
         return {{ .WrapToProtoType "data" }}
@@ -72,7 +88,7 @@
 
 {{- if .Function.IsSubscription }}
 func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {
-    args := {{ .CodeList.PackageMap.ProtoPackageName }}.{{ .Function.FunctionName }}Args{}
+    args := {{ $ProtoPackageName }}.{{ .Function.FunctionName }}Args{}
 
     if err := proto.Unmarshal(argsBytes, &args); err != nil {
         return nil, err
@@ -81,23 +97,59 @@ func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback
     return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" }}, {{ end }}func(data {{ .GetEventTypeName }}) {
         {{ range $i, $item := .FlatFields -}}
             //{{ $i }}
-            {{ if $item.IsPrimitive -}}
-            {{- template "gen_primitive" $item -}}
-            {{- else if $item.IsPrimitivePointer -}}
-            {{- template "gen_wrapped_primitive" $item -}}
-            {{- else if $item.Struct -}}
-            {{- template "gen_struct" $item -}}
-            {{- else if $item.Slice -}}
-            {{- template "gen_slice" $item -}}
-            {{- else if $item.Pointer -}}
-            {{- template "gen_pointer" $item -}}
-            {{- end -}}
-        {{- end -}}
+            {{- template "gen_field" $item }}
+        {{ end -}}
 
         bytes, err := proto.Marshal(gen{{ .GetLastFunction.GetGenFuncName }}(data))
         if err == nil {
             callback.OnEvent(bytes)
         }
     })
+}
+
+func getEventName{{ .Function.FunctionName }}(argsBytes []byte) (string, error) {
+    args := {{ $ProtoPackageName }}.{{ .Function.FunctionName }}Args{}
+
+    if err := proto.Unmarshal(argsBytes, &args); err != nil {
+        return "", err
+    }
+
+    fullName := "{{ .Function.FunctionName }}" + fmt.Sprintf("
+    {{- range $item := $Args }}:%v{{ end -}}
+    ", {{- range $i, $item := $Args }}{{ $item.GetUpperCamelCaseName "args." "" -}}
+    {{- if .NotIsLastField $Args $i }}, {{ end -}}
+    {{- end -}})
+
+    return fullName, nil
+}
+{{ else if .Function.IsPure }}
+
+{{ else }}
+func callAdapterFor{{ .Function.FunctionName }}(argsBytes []byte, callback goapi.FuncCallback) {
+    args := {{ $ProtoPackageName }}.{{ .Function.FunctionName }}Args{}
+
+    if err := proto.Unmarshal(argsBytes, &args); err != nil {
+        callback.OnError(err.Error())
+        return
+    }
+
+    res, err := {{ .Package }}.{{ .Function.FunctionName }}(
+    {{- range $i, $item := $Args }}{{ $item.GetUpperCamelCaseName "args." "go" -}}
+    {{- if .NotIsLastField $Args $i }}, {{- end -}}
+    {{- end }})
+    if err != nil {
+        callback.OnError(err.Error())
+    } else {
+    {{ range $i, $item := .FlatFields -}}
+        //{{ $i }}
+        {{- template "gen_field" $item }}
+    {{ end }}
+        bytes, err := proto.Marshal(gen{{ .GetLastFunction.GetGenFuncName }}(res))
+        if err == nil {
+            callback.OnSuccess(bytes)
+        } else {
+            callback.OnError(err.Error())
+        }
+    }
 }
 {{ end }}
