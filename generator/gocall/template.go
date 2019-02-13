@@ -9,7 +9,7 @@ import (
 
 type TemplateStructData struct {
 	Fields     []adapter.Field
-	FlatFields []adapter.Type
+	FlatFields []*adapter.Type
 	Adapter    *adapter.Adapter
 	CodeList   *generator.CodeList
 	Function   adapter.Function
@@ -26,10 +26,14 @@ func (t TemplateStructData) GetEventTypeName() string {
 		name = string(rvt.Pointer.InnerType.Name)
 		star = "*"
 	} else {
-		name  = string(rvt.Name)
+		name = string(rvt.Name)
 		star = ""
 	}
 	return fmt.Sprintf("%v%v.%v", star, t.Package, name)
+}
+
+func (t TemplateStructData) GetLastFunction() *adapter.Type {
+	return t.FlatFields[len(t.FlatFields)-1]
 }
 
 //func (t TemplateStructData) GetEventTypeName() string {
@@ -37,52 +41,52 @@ func (t TemplateStructData) GetEventTypeName() string {
 //	   return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" $item.Type.IsPrimitive }}, {{ end }}func(data *{{ .Package }}.{{ .GetEventTypeName }}) {
 //}
 
-func flattenFieldsResult(returnedFields []adapter.Field) []adapter.Type {
-	flatten := make([]adapter.Type, 0, 10)
-	unique := make(map[interface{}]bool)
+func flattenFieldsResult(returnedFields []adapter.Field) []*adapter.Type {
+	flatten := make([]*adapter.Type, 0, 10)
+	unique := make(map[*adapter.Type]bool)
 
 	if len(returnedFields) > 0 {
-		flattenType(returnedFields[0].Type, &unique, &flatten)
+		f := flattenType(returnedFields[0].Type, unique)
+		flatten = append(flatten, f...)
 	}
 
 	return flatten
 }
 
-func flattenType(typ adapter.Type, unique *map[interface{}]bool, flatten *[]adapter.Type) *[]adapter.Type {
-	if _, ok := (*unique)[typ]; ok {
-		return flatten
-	}
-	(*unique)[typ] = true
+func flattenType(typ *adapter.Type, unique map[*adapter.Type]bool) []*adapter.Type {
+	flatten := make([]*adapter.Type, 0, 10)
 
 	if typ.IsPrimitive || typ.IsPrimitivePointer() {
-		//TODO просто добавляем
+		//просто добавляем
 	} else if typ.Pointer != nil {
-		flattenType(typ.Pointer.InnerType, unique, flatten)
+		f := flattenType(typ.Pointer.InnerType, unique)
+		flatten = append(flatten, f...)
 	} else if typ.Struct != nil {
-		flattenStructType(typ.Struct.Fields, unique, flatten)
+		f := flattenStructType(typ.Struct.Fields, unique)
+		flatten = append(flatten, f...)
 	} else if typ.Slice != nil {
-		flattenType(typ.Slice.InnerType, unique, flatten)
+		f := flattenType(typ.Slice.InnerType, unique)
+		flatten = append(flatten, f...)
 	} else {
 		log.Warnf("unwanted type %+v", typ)
 	}
 
-	*flatten = append(*flatten, typ)
+	if _, ok := unique[typ]; !ok {
+		unique[typ] = true
+		flatten = append(flatten, typ)
+	}
 
 	return flatten
 }
 
-func flattenStructType(args []adapter.Field, unique *map[interface{}]bool, flatten *[]adapter.Type) *[]adapter.Type {
-	var f *[]adapter.Type
+func flattenStructType(args []adapter.Field, unique map[*adapter.Type]bool) []*adapter.Type {
+	flatten := make([]*adapter.Type, 0, 10)
 	for _, v := range args {
-		if _, ok := (*unique)[v]; ok {
-			continue
-		}
-		(*unique)[v] = true
-
-		f = flattenType(v.Type, unique, flatten)
+		f := flattenType(v.Type, unique)
+		flatten = append(flatten, f...)
 	}
 
-	return f
+	return flatten
 }
 
 type ObjectType struct {
@@ -115,7 +119,7 @@ func BuildObjects(function adapter.Function) []ObjectType {
 	return res
 }
 
-func AppendObject(typ adapter.Type, objects []ObjectType) ObjectType {
+func AppendObject(typ *adapter.Type, objects []ObjectType) ObjectType {
 	var pointer *Pointer
 	var slice *Slice
 	var str *Struct
@@ -164,7 +168,7 @@ func AppendObject(typ adapter.Type, objects []ObjectType) ObjectType {
 //////////////
 
 type TemplateProtoTypeData struct {
-	Type        adapter.Type
+	Type        *adapter.Type
 	Name        string
 	FieldNumber int
 }
@@ -175,7 +179,7 @@ func (d TemplateProtoTypeData) GetFieldString() string {
 	//return fmt.Sprintf("%v %v = %v;", tn, d.Name, d.FieldNumber)
 }
 
-func getFieldStringInner(typ adapter.Type, name string, fieldNumber int) string {
+func getFieldStringInner(typ *adapter.Type, name string, fieldNumber int) string {
 	var typeName string
 	if typ.Pointer != nil {
 		if !typ.Pointer.InnerType.IsPrimitive {

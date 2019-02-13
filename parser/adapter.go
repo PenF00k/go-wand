@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"gitlab.vmassive.ru/wand/adapter"
 	"gitlab.vmassive.ru/wand/generator"
 	"go/ast"
@@ -113,8 +114,9 @@ func adoptFields(codeList *generator.CodeList, list *ast.FieldList, pack string)
 	return fields
 }
 
-func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) adapter.Type {
+var typeContext = make(map[string]*adapter.Type)
 
+func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) *adapter.Type {
 	var TypeName string
 	var Pointer *adapter.Pointer
 	var Slice *adapter.Slice
@@ -123,30 +125,35 @@ func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) adapter.T
 	var Function *adapter.Function
 	var IsPrimitive bool
 	var Selector *adapter.Selector
+	var innerName string
 
-Loop:
 	switch x := tp.(type) {
 	case *ast.StarExpr:
 		Pointer = &adapter.Pointer{
 			InnerType: adoptType(codeList, x.X, pack),
 		}
+		innerName = fmt.Sprintf("ptr_%s", Pointer.InnerType.InnerName)
 
 	case *ast.ArrayType:
 		Slice = &adapter.Slice{
 			InnerType: adoptType(codeList, x.Elt, pack),
 		}
+		innerName = fmt.Sprintf("slc_%s", Slice.InnerType.InnerName)
 
 	case *ast.MapType:
 		Map = &adapter.Map{
 			KeyType:   adoptType(codeList, x.Key, pack),
 			ValueType: adoptType(codeList, x.Value, pack),
 		}
+		innerName = fmt.Sprintf("mp_%s_%s", Map.KeyType.InnerName, Map.ValueType.InnerName)
 
 	case *ast.StructType:
 		Struct = adoptInnerStructure(codeList, x, pack)
+		innerName = fmt.Sprintf("strt_%s", Struct.Name)
 
 	case *ast.FuncType:
 		Function = adoptInnerFunction(codeList, x, pack)
+		innerName = fmt.Sprintf("func_%s", Function.FunctionName)
 
 	case *ast.Ident:
 		TypeName = x.Name
@@ -154,11 +161,15 @@ Loop:
 			if v.Name == TypeName {
 				s := adoptStructure(codeList, v)
 				Struct = &s
-				break Loop
+				break
 			}
 		}
 
-		IsPrimitive = true
+		if Struct == nil {
+			IsPrimitive = true
+		}
+
+		innerName = fmt.Sprintf("prmt_%s", TypeName)
 
 	case *ast.SelectorExpr:
 		n := adoptType(codeList, x.X, pack).Name
@@ -166,10 +177,17 @@ Loop:
 			Package:  string(n),
 			TypeName: adapter.TypeName(x.Sel.Name),
 		}
+
+		innerName = fmt.Sprintf("sltr_%s_%s", Selector.Package, Selector.TypeName)
+
 		//Package = &x.Sel.Name //TODO а так ли это?? или pack возьмем?
 	}
 
-	return adapter.Type{
+	if tp, exists := typeContext[innerName]; exists {
+		return tp
+	}
+
+	res := adapter.Type{
 		Name:        adapter.TypeName(TypeName),
 		Pointer:     Pointer,
 		Slice:       Slice,
@@ -178,11 +196,12 @@ Loop:
 		Function:    Function,
 		IsPrimitive: IsPrimitive,
 		Selector:    Selector,
+		InnerName:   innerName,
 	}
-}
 
-func toTypeName(name string) string {
-	return name
+	typeContext[innerName] = &res
+
+	return &res
 }
 
 func adoptInnerStructure(codeList *generator.CodeList, structType *ast.StructType, pack string) *adapter.Struct {

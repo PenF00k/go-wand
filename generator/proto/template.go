@@ -3,6 +3,7 @@ package proto
 import (
 	"fmt"
 	"gitlab.vmassive.ru/wand/adapter"
+	"gitlab.vmassive.ru/wand/generator/formatter"
 )
 
 type TemplateStructData struct {
@@ -11,7 +12,7 @@ type TemplateStructData struct {
 }
 
 type TemplateProtoTypeData struct {
-	Type        adapter.Type
+	Type        *adapter.Type
 	Name        string
 	FieldNumber int
 }
@@ -22,7 +23,7 @@ func (d TemplateProtoTypeData) GetFieldString() string {
 	//return fmt.Sprintf("%v %v = %v;", tn, d.Name, d.FieldNumber)
 }
 
-func getFieldStringInner(typ adapter.Type, name string, fieldNumber int) string {
+func getFieldStringInner(typ *adapter.Type, name string, fieldNumber int) string {
 	var typeName string
 	if typ.Pointer != nil {
 		if !typ.Pointer.InnerType.IsPrimitive {
@@ -46,12 +47,12 @@ func getFieldStringInner(typ adapter.Type, name string, fieldNumber int) string 
 }
 
 func toProtoName(name string, isPointer bool) string {
-	var f protoFormatter
+	var f format.TypeFormatter
 	if isPointer {
-		f = PointerFormatter
+		f = format.PointerTypeFormatter
 	} else {
-		f = BasicFormatter
+		f = format.BasicProtoTypeFormatter
 	}
 
-	return f.format(name)
+	return f.Format(name)
 }

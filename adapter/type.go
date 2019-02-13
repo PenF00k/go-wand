@@ -3,6 +3,7 @@ package adapter
 import (
 	"fmt"
 	"github.com/iancoleman/strcase"
+	"gitlab.vmassive.ru/wand/generator/formatter"
 	"go/ast"
 )
 
@@ -29,6 +30,7 @@ type Type struct {
 	Function    *Function
 	IsPrimitive bool
 	Selector    *Selector
+	InnerName   string
 }
 
 func (t Type) IsPrimitivePointer() bool {
@@ -39,14 +41,52 @@ func (t Type) ToUpperCamelCase() string {
 	return strcase.ToCamel(string(t.Name))
 }
 
+func (t Type) GetGenFuncName() string {
+	if t.IsPrimitivePointer() {
+		return t.Pointer.InnerType.GetGenFuncName() + "Wrapper"
+	}
+	if t.Pointer != nil {
+		return t.Pointer.InnerType.GetGenFuncName() + "Pointer"
+	} else if t.Slice != nil {
+		return t.Slice.InnerType.GetGenFuncName() + "Slice"
+	}
+
+	return t.ToUpperCamelCase()
+}
+
+func (t Type) GetWrapperName(toPointer bool) string {
+	sign := getPointerSign(toPointer)
+
+	if t.IsPrimitivePointer() {
+		protoType := format.BasicGoTypeFormatter.Format(string(t.Pointer.InnerType.Name))
+		return fmt.Sprintf("%swrappers.%vValue", sign, strcase.ToCamel(protoType))
+	} else if t.IsPrimitive {
+		//return string(t.Name)
+		return format.BasicGoTypeFormatter.Format(string(t.Name))
+	}
+
+	return t.ToUpperCamelCase()
+}
+
+func (t Type) WrapToProtoType(s string) string {
+	if t.IsPrimitivePointer() {
+		return format.GoFormatter.Format(string(t.Pointer.InnerType.Name), s)
+	} else if t.IsPrimitive {
+		return format.GoFormatter.Format(string(t.Name), s)
+	}
+
+	return ""
+}
+
 func (t Type) GetActualTypeName(upperCase bool) string {
 	if t.IsPrimitivePointer() {
-		return fmt.Sprintf("wrappers.%vValue", t.Pointer.InnerType.GetActualTypeName(upperCase))
+		//return fmt.Sprintf("wrappers.%vValue", t.Pointer.InnerType.GetActualTypeName(upperCase))
+		return t.Pointer.InnerType.GetActualTypeName(upperCase)
 	}
 	if t.Pointer != nil {
 		return t.Pointer.InnerType.GetActualTypeName(upperCase)
 	} else if t.Slice != nil {
-		return t.Slice.InnerType.GetActualTypeName(upperCase) + "Slice"
+		return t.Slice.InnerType.GetActualTypeName(upperCase)
 	}
 	if upperCase {
 		return t.ToUpperCamelCase()
@@ -56,30 +96,75 @@ func (t Type) GetActualTypeName(upperCase bool) string {
 	}
 }
 
-func (t Type) GetPrintableTypeName() string {
+func (t Type) GetParamTypeName(pack string) string {
 	if t.Pointer != nil {
-		return "*" + t.Pointer.InnerType.GetPrintableTypeName()
+		return "*" + t.Pointer.InnerType.GetParamTypeName(pack)
 	} else if t.Slice != nil {
-		return "[]" + t.Slice.InnerType.GetPrintableTypeName()
+		return "[]" + t.Slice.InnerType.GetParamTypeName(pack)
 	} else if t.Selector != nil {
 		s := t.Selector
 		return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+	} else if t.IsPrimitivePointer() {
+		return t.GetWrapperName(false)
+	} else if t.IsPrimitive {
+		return string(t.Name)
+	}
+
+	if pack != "" {
+		return fmt.Sprintf("%v.%v", pack, t.Name)
+	}
+
+	return string(t.Name)
+}
+
+func (t Type) GetReturnTypeName(pack string, toPointer bool) string {
+	return t.getReturnTypeInner(pack, false, toPointer)
+}
+
+func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer bool) string {
+	sign := getPointerSign(toPointer)
+
+	if t.IsPrimitivePointer() {
+		return t.GetWrapperName(toPointer)
+	} else if t.Pointer != nil {
+		it := t.Pointer.InnerType
+		return sign + it.getReturnTypeInner(pack, it.Struct != nil, toPointer)
+	} else if t.Struct != nil && !skipStructure {
+		return sign + t.getReturnTypeInner(pack, true, toPointer)
+	} else if t.Slice != nil {
+		var ps string
+		t := t.Slice.InnerType
+		if t.Pointer == nil && !t.IsPrimitive {
+			ps = sign
+		}
+
+		return fmt.Sprintf("[]%s%s", ps, t.getReturnTypeInner(pack, true, toPointer))
+		//return "[]" + t.Slice.InnerType.GetReturnTypeName(pack)
+	} else if t.Selector != nil {
+		s := t.Selector
+		return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+	} else if t.IsPrimitive {
+		return string(t.Name)
+	}
+
+	if pack != "" {
+		return fmt.Sprintf("%v.%v", pack, t.Name)
 	}
 
 	return string(t.Name)
 }
 
 type Pointer struct {
-	InnerType Type
+	InnerType *Type
 }
 
 type Slice struct {
-	InnerType Type
+	InnerType *Type
 }
 
 type Map struct {
-	KeyType   Type
-	ValueType Type
+	KeyType   *Type
+	ValueType *Type
 }
 
 type Struct struct {
@@ -92,7 +177,7 @@ type Struct struct {
 type Field struct {
 	Name string
 	//TypeName TypeName
-	Type Type
+	Type *Type
 }
 
 func (f Field) NotIsLastField(list []Field, i int) bool {
@@ -107,8 +192,12 @@ func (f Field) GetActualTypeName(upperCase bool) string {
 	return f.Type.GetActualTypeName(upperCase)
 }
 
-func (f Field) GetPrintableTypeName() string {
-	return f.Type.GetPrintableTypeName()
+func (f Field) GetParamTypeName(pack string) string {
+	return f.Type.GetParamTypeName(pack)
+}
+
+func (f Field) GetReturnTypeName(pack string, toPointer bool) string {
+	return f.Type.GetReturnTypeName(pack, toPointer)
 }
 
 func (f Field) IsExported() bool {
@@ -126,16 +215,16 @@ func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 		return n
 	}
 
-	var formatter fieldFormatter
+	var formatter format.FieldFormatter
 	switch target {
 	case "proto":
-		formatter = ProtoFormatter
+		formatter = format.ProtoFormatter
 	case "go":
-		formatter = GoFormatter
+		formatter = format.GoFormatter
 	}
 
 	if formatter != nil {
-		n = formatter.format(string(f.Type.Name), n)
+		n = formatter.Format(string(f.Type.Name), n)
 	}
 
 	return n
@@ -173,4 +262,11 @@ type Subscription struct {
 type Selector struct {
 	Package  string
 	TypeName TypeName
+}
+
+func getPointerSign(toPointer bool) string {
+	if toPointer {
+		return "*"
+	}
+	return "&"
 }

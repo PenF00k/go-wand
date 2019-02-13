@@ -6,11 +6,11 @@ import (
 	"gitlab.vmassive.ru/wand/adapter"
 	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/util"
-	"html/template"
 	"io"
 	"os"
 	"os/exec"
 	"path"
+	"text/template"
 )
 
 //func (f Field) NotIsLastField(list []Field, i int) bool {
@@ -153,14 +153,14 @@ func (gen GoCodeGenerator) writeFunction(wr io.Writer, pack string, function ada
 	}
 
 	f := gen.createFunction(function)
-	err = t.Execute(wr, f)
+	err = t.Option().Execute(wr, f)
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
 	}
 }
 
 func (gen GoCodeGenerator) createFunction(function adapter.Function) TemplateStructData {
-	var flatten []adapter.Type
+	var flatten []*adapter.Type
 
 	if function.IsSubscription {
 		flatten = flattenFieldsResult(function.ReturnValues)

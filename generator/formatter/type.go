@@ -1,15 +1,16 @@
-package proto
+package format
 
-type protoFormatter interface {
-	format(TypeName string) string
+type TypeFormatter interface {
+	Format(TypeName string) string
 }
 
-var PointerFormatter = pointerFormatter{}
-var BasicFormatter = basicFormatter{}
+var PointerTypeFormatter = pointerTypeFormatter{}
+var BasicProtoTypeFormatter = basicProtoTypeFormatter{}
+var BasicGoTypeFormatter = basicGoTypeFormatter{}
 
-type pointerFormatter struct{}
+type pointerTypeFormatter struct{}
 
-func (f pointerFormatter) format(TypeName string) string {
+func (f pointerTypeFormatter) Format(TypeName string) string {
 	switch TypeName {
 	case "float32":
 		return "google.protobuf.FloatValue"
@@ -38,9 +39,9 @@ func (f pointerFormatter) format(TypeName string) string {
 	return TypeName
 }
 
-type basicFormatter struct{}
+type basicProtoTypeFormatter struct{}
 
-func (f basicFormatter) format(TypeName string) string {
+func (f basicProtoTypeFormatter) Format(TypeName string) string {
 	switch TypeName {
 	case "float32":
 		return "float"
@@ -64,6 +65,22 @@ func (f basicFormatter) format(TypeName string) string {
 		return "bytes"
 	case "time.Time":
 		return "google.protobuf.Timestamp"
+	}
+
+	return TypeName
+}
+
+
+type basicGoTypeFormatter struct{}
+
+func (f basicGoTypeFormatter) Format(TypeName string) string {
+	switch TypeName {
+	case "int":
+		fallthrough
+	case "int8":
+		fallthrough
+	case "int16":
+		return "int32"
 	}
 
 	return TypeName
