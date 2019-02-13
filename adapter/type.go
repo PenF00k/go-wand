@@ -1,10 +1,18 @@
 package adapter
 
-import "github.com/iancoleman/strcase"
+import (
+	"fmt"
+	"github.com/iancoleman/strcase"
+	"go/ast"
+)
 
 type TypeName string
 type StructName string
 type FunctionName string
+
+func (tn TypeName) ToUpperCamelCase() string {
+	return strcase.ToCamel(string(tn))
+}
 
 type Adapter struct {
 	Structures    []Struct
@@ -25,6 +33,40 @@ type Type struct {
 
 func (t Type) IsPrimitivePointer() bool {
 	return t.Pointer != nil && t.Pointer.InnerType.IsPrimitive
+}
+
+func (t Type) ToUpperCamelCase() string {
+	return strcase.ToCamel(string(t.Name))
+}
+
+func (t Type) GetActualTypeName(upperCase bool) string {
+	if t.IsPrimitivePointer() {
+		return fmt.Sprintf("wrappers.%vValue", t.Pointer.InnerType.GetActualTypeName(upperCase))
+	}
+	if t.Pointer != nil {
+		return t.Pointer.InnerType.GetActualTypeName(upperCase)
+	} else if t.Slice != nil {
+		return t.Slice.InnerType.GetActualTypeName(upperCase) + "Slice"
+	}
+	if upperCase {
+		return t.ToUpperCamelCase()
+	} else {
+		return string(t.Name)
+
+	}
+}
+
+func (t Type) GetPrintableTypeName() string {
+	if t.Pointer != nil {
+		return "*" + t.Pointer.InnerType.GetPrintableTypeName()
+	} else if t.Slice != nil {
+		return "[]" + t.Slice.InnerType.GetPrintableTypeName()
+	} else if t.Selector != nil {
+		s := t.Selector
+		return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+	}
+
+	return string(t.Name)
 }
 
 type Pointer struct {
@@ -57,12 +99,28 @@ func (f Field) NotIsLastField(list []Field, i int) bool {
 	return i != len(list)-1
 }
 
+func (f Field) ToUpperCamelCase() string {
+	return strcase.ToCamel(string(f.Name))
+}
+
+func (f Field) GetActualTypeName(upperCase bool) string {
+	return f.Type.GetActualTypeName(upperCase)
+}
+
+func (f Field) GetPrintableTypeName() string {
+	return f.Type.GetPrintableTypeName()
+}
+
+func (f Field) IsExported() bool {
+	return ast.IsExported(f.Name)
+}
+
 func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 	n := prefix + strcase.ToCamel(f.Name)
 
-	if f.Type.IsPrimitivePointer() {
-		n += ".Value"
-	}
+	//if f.Type.IsPrimitivePointer() {
+	//	n += ".Value"
+	//}
 
 	if target == "" {
 		return n
@@ -70,7 +128,7 @@ func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 
 	var formatter fieldFormatter
 	switch target {
-	case "pro":
+	case "proto":
 		formatter = ProtoFormatter
 	case "go":
 		formatter = GoFormatter

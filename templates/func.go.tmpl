@@ -1,49 +1,69 @@
 {{/*{{ $Params := .Params }}*/}}
 {{/*{{ $ReturnType := .ReturnType }}*/}}
 
+{{/*{{ define "gen_any" }}*/}}
+    {{/*{{ if .IsPrimitivePointer }}*/}}
+        {{/*{{ template "gen_primitive" . }}*/}}
+    {{/*{{ else }}*/}}
+        {{/*gen{{ .Name }}*/}}
+    {{/*{{ end }}*/}}
+{{/*{{ end }}*/}}
+
 {{ define "gen_primitive" }}
-    gen{{ .TypeName }} := func(data {{ .TypeName }}) {{ if .IsPointer }}{{ .ProtoPackageName }}.{{ .TypeName }}{{ else }}.TypeName{{ end }} {
-        {{ if .IsPointer }}
+    {{ $UpperCaseName := .ToUpperCamelCase -}}
+    {{- $WrapperName := .GetActualTypeName true -}}
+
+    {{ if .Pointer }}
+    gen{{ $UpperCaseName }}Wrapper := func(data {{ .GetPrintableTypeName }}) *{{ $WrapperName }} {
+        if data == nil {
+            return nil
+        }
+
+        return &{{ $WrapperName }}{
+            Value: *data,
+        }
+    }
+    {{ else }}
+    gen{{ $UpperCaseName }} := func(data {{ .Name }}) {{ .Name }} {
         return data
-        {{ else }}
-        return wrappers.
+    }
+    {{ end}}
+{{ end }}
+
+{{ define "gen_struct" }}
+    {{ $UpperCaseName := .Name.ToUpperCamelCase -}}
+    {{ $Package := "client" -}}
+    {{ $ProtoPackageName := "proto_client" -}}
+
+    gen{{ $UpperCaseName }} := func(data *{{ $Package }}.{{ .Name }}) *{{ $ProtoPackageName }}.{{ .Name }} {
+        res := &{{ $ProtoPackageName }}.{{ .Name }}{
+        {{ range $item := .Struct.Fields }}
+            {{ if $item.IsExported }}
+            {{ $item.GetUpperCamelCaseName "" "" }}: gen{{ $item.GetActualTypeName true }}(data.{{ $item.Name }}),
+            {{ end }}
         {{ end }}
+        }
+
+        return res
     }
 {{ end }}
 
-{{/*{{ define "gen_struct" }}*/}}
-    {{/*gen{{ .TypeName }} := func(data {{ .Package }}.{{ .TypeName }}) {{ .ProtoPackageName }}.{{ .TypeName }} {*/}}
-        {{/*str := {{ .ProtoPackageName }}.{{ .TypeName }}{*/}}
-        {{/*{{ range $item := .Fields }}*/}}
-            {{/*{{ if $item.IsPrimitive }}*/}}
-            {{/*{{ template "gen_primitive" $item }}*/}}
-            {{/*{{ else }}*/}}
-            {{/*gen{{ $item.TypeName }}*/}}
-            {{/*{{ end }}*/}}
-        {{/*{{ end }}*/}}
-        {{/*}*/}}
+{{ define "gen_slice" }}
+    {{ $UpperCaseName := .Name.ToUpperCamelCase -}}
+    {{- $Package := "client" -}}
+    {{ $ProtoPackageName := "proto_client" -}}
 
-        {{/*return str*/}}
-    {{/*}*/}}
-{{/*{{ end }}*/}}
+    gen{{ .GetActualTypeName true }} := func(data {{ .GetPrintableTypeName }}) {{ .GetPrintableTypeName }} {
+        res := make({{ .GetPrintableTypeName }}, 0, len(data))
 
-{{/*{{ define "gen_slice" }}*/}}
-    {{/*gen{{ .TypeName }} := func(data []{{ .Package }}.{{ .TypeName }}) []{{ .ProtoPackageName }}.{{ .TypeName }} {*/}}
-        {{/*var res []{{ .ProtoPackageName }}.{{ .TypeName }}*/}}
+        for _, v := range data {
+            d := gen{{ $UpperCaseName }}(v)
+            res = append(res, d)
+        }
 
-        {{/*res := make([]{{ .ProtoPackageName }}.{{ .TypeName }}, len(data))*/}}
-        {{/*for i, v := range data {*/}}
-            {{/*{{ if .IsPrimitive }}*/}}
-                {{/*{{ template "gen_primitive" . }}*/}}
-            {{/*{{ else }}*/}}
-                {{/*gen{{ .TypeName }}*/}}
-            {{/*{{ end }}*/}}
-            {{/*res[i] = v*/}}
-        {{/*}*/}}
-
-        {{/*return arr*/}}
-    {{/*}*/}}
-{{/*{{ end }}*/}}
+        return res
+    }
+{{ end }}
 
 {{- if .Function.IsSubscription }}
 func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback) (goapi.Subscription, error) {
@@ -54,19 +74,20 @@ func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback
     }
 
     return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" }}, {{ end }}func(data {{ .GetEventTypeName }}) {
-    {{ range $i, $item := .Function.Args }}
-        {{ $i }}
-        {{ $item }}
-        {{/*{{ .GetFieldString }}*/}}
+        {{ range $i, $item := .FlatFields -}}
+            {{- if or $item.IsPrimitivePointer $item.IsPrimitive -}}
+            {{- template "gen_primitive" $item -}}
+            {{- else if $item.Struct -}}
+            {{- template "gen_struct" $item -}}
+            {{- else if $item.Slice -}}
+            {{- template "gen_slice" $item -}}
+            {{- end -}}
+        {{- end -}}
 
-
-    {{ end }}
-    {{/*dataProto := {{ .ProtoPackageName }}.{{ $ReturnType.EventName }}{*/}}
-        {{/*{{ template "build2" $ReturnType }}*/}}
-
-    if err == nil {
-        callback.OnEvent(bytes)
-    }
-   })
+        bytes, err := proto.Marshal(&dataProto)
+        if err == nil {
+            callback.OnEvent(bytes)
+        }
+    })
 }
 {{ end }}

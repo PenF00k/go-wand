@@ -15,6 +15,8 @@ func (f protoFormatter) format(typ, val string) string {
 	switch typ {
 	case "int":
 		return fmt.Sprintf("int32(%v)", val)
+	case "float32":
+		return fmt.Sprintf("float(%v)", val)
 	default:
 		return val
 	}
@@ -26,6 +28,8 @@ func (f goFormatter) format(typ, val string) string {
 	switch typ {
 	case "int":
 		return fmt.Sprintf("int(%v)", val)
+	case "float32":
+		return fmt.Sprintf("float32(%v)", val)
 	default:
 		return val
 	}
