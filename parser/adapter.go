@@ -153,7 +153,9 @@ func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) *adapter.
 
 	case *ast.FuncType:
 		Function = adoptInnerFunction(codeList, x, pack)
-		innerName = fmt.Sprintf("func_%s", Function.FunctionName)
+		fn := Function.FunctionName
+
+		innerName = fmt.Sprintf("func_%s", fn)
 
 	case *ast.Ident:
 		TypeName = x.Name
@@ -161,21 +163,31 @@ func adoptType(codeList *generator.CodeList, tp ast.Expr, pack string) *adapter.
 			if v.Name == TypeName {
 				s := adoptStructure(codeList, v)
 				Struct = &s
+				innerName = fmt.Sprintf("strt_%s", Struct.Name)
 				break
 			}
 		}
 
 		if Struct == nil {
 			IsPrimitive = true
+			innerName = fmt.Sprintf("prmt_%s", TypeName)
 		}
 
-		innerName = fmt.Sprintf("prmt_%s", TypeName)
-
 	case *ast.SelectorExpr:
-		n := adoptType(codeList, x.X, pack).Name
+		xType := adoptType(codeList, x.X, pack)
+		var selType *adapter.Type
+
+		// let's assume the selector type is always an ast.TypeSpec
+		if x.Sel != nil && x.Sel.Obj != nil && x.Sel.Obj.Decl != nil {
+			if ts, ok := x.Sel.Obj.Decl.(*ast.TypeSpec); ok {
+				selType = adoptType(codeList, ts.Type, pack)
+			}
+		}
+
 		Selector = &adapter.Selector{
-			Package:  string(n),
+			Package:  string(xType.Name),
 			TypeName: adapter.TypeName(x.Sel.Name),
+			Type:     selType,
 		}
 
 		innerName = fmt.Sprintf("sltr_%s_%s", Selector.Package, Selector.TypeName)
@@ -212,10 +224,21 @@ func adoptInnerStructure(codeList *generator.CodeList, structType *ast.StructTyp
 }
 
 func adoptInnerFunction(codeList *generator.CodeList, funcType *ast.FuncType, pack string) *adapter.Function {
+	args := adoptFields(codeList, funcType.Params, pack)
+	returnValues := adoptFields(codeList, funcType.Results, pack)
+
+	fn := "event"
+	for _, v := range args {
+		fn = fn + "_" + v.Type.InnerName
+	}
+	for _, v := range returnValues {
+		fn = fn + "_" + v.Type.InnerName
+	}
+
 	return &adapter.Function{
-		//FunctionName:   "todo", //TODO
-		Args:           adoptFields(codeList, funcType.Params, pack),
-		ReturnValues:   adoptFields(codeList, funcType.Results, pack),
+		FunctionName:   fn,
+		Args:           args,
+		ReturnValues:   returnValues,
 		IsPure:         true,
 		IsSubscription: false,
 	}

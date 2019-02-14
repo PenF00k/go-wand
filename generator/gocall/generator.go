@@ -146,36 +146,45 @@ func (gen GoCodeGenerator) writeFunction(wr io.Writer, pack string, function ada
 	tpath := "templates/func.go.tmpl"
 	base := path.Base(tpath)
 
-	t, err := template.New(base).ParseFiles(tpath)
+	t, err := template.
+		New(base).
+		Funcs(template.FuncMap{
+			"toBoolPointer": func(b bool) *bool {
+				return &b
+			},
+		}).
+		ParseFiles(tpath)
 	if err != nil {
 		log.Errorf("failed with error %v", err)
 		//return
 	}
 
 	f := gen.createFunction(function)
-	err = t.Option().Execute(wr, f)
+	err = t.Execute(wr, f)
 	if err != nil {
 		log.Errorf("template failed with error %v", err)
 	}
 }
 
 func (gen GoCodeGenerator) createFunction(function adapter.Function) TemplateStructData {
-	var flatten []*adapter.Type
+	//var flatten []*adapter.Type
 
 	//if function.IsSubscription {
 	//	flatten = flattenFieldsResult(function.ReturnValues)
 	//} else {
 	//	flatten = flattenFieldsResult(function.ReturnValues)
 	//}
-	flatten = flattenFieldsResult(function.ReturnValues)
+	flattenArgs := flattenArgFieldsResult(function.Args)
+	flatten := flattenResultFieldsResult(function.ReturnValues)
 
 	return TemplateStructData{
-		Fields:     function.Args,
-		FlatFields: flatten,
-		Adapter:    gen.Adapter,
-		CodeList:   gen.CodeList,
-		Function:   function,
-		Package:    gen.Package,
+		Fields:        function.Args,
+		FlatArgFields: flattenArgs,
+		FlatFields:    flatten,
+		Adapter:       gen.Adapter,
+		CodeList:      gen.CodeList,
+		Function:      function,
+		Package:       gen.Package,
 	}
 }
 

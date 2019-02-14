@@ -37,6 +37,11 @@ func (t Type) IsPrimitivePointer() bool {
 	return t.Pointer != nil && t.Pointer.InnerType.IsPrimitive
 }
 
+
+func (t Type) IsPointer() bool {
+	return t.Pointer != nil
+}
+
 func (t Type) ToUpperCamelCase() string {
 	return strcase.ToCamel(string(t.Name))
 }
@@ -44,17 +49,20 @@ func (t Type) ToUpperCamelCase() string {
 func (t Type) GetGenFuncName() string {
 	if t.IsPrimitivePointer() {
 		return t.Pointer.InnerType.GetGenFuncName() + "Wrapper"
-	}
-	if t.Pointer != nil {
+	} else if t.Pointer != nil {
 		return t.Pointer.InnerType.GetGenFuncName() + "Pointer"
 	} else if t.Slice != nil {
 		return t.Slice.InnerType.GetGenFuncName() + "Slice"
+	} else if t.Selector != nil {
+		x := strcase.ToCamel(string(t.Selector.Package))
+		sel := strcase.ToCamel(string(t.Selector.TypeName))
+		return fmt.Sprintf("%s%s", x, sel)
 	}
 
 	return t.ToUpperCamelCase()
 }
 
-func (t Type) GetWrapperName(toPointer bool) string {
+func (t Type) GetWrapperName(toPointer *bool, reverse bool) string {
 	sign := getPointerSign(toPointer)
 
 	if t.IsPrimitivePointer() {
@@ -64,6 +72,12 @@ func (t Type) GetWrapperName(toPointer bool) string {
 		//return string(t.Name)
 		return format.BasicGoTypeFormatter.Format(string(t.Name))
 	}
+	//if t.Selector != nil {
+	//	sel := t.Selector
+	//	if sel.Package == "time" && sel.TypeName == "Time" {
+	//		return fmt.Sprintf("%stimestamp.Timestamp", sign)
+	//	}
+	//}
 
 	return t.ToUpperCamelCase()
 }
@@ -73,6 +87,38 @@ func (t Type) WrapToProtoType(s string) string {
 		return format.GoFormatter.Format(string(t.Pointer.InnerType.Name), s)
 	} else if t.IsPrimitive {
 		return format.GoFormatter.Format(string(t.Name), s)
+	}
+	//if t.Selector != nil {
+	//	sel := t.Selector
+	//	if sel.Package == "time" && sel.TypeName == "Time" {
+	//		return fmt.Sprintf("timestamp.Timestamp")
+	//	}
+	//}
+
+	return ""
+}
+
+func (t Type) WrapToDefaultGoType(s string) string {
+	if t.IsPrimitivePointer() {
+		return format.DefaultFormatter.Format(string(t.Pointer.InnerType.Name), s)
+	} else if t.IsPrimitive {
+		return format.DefaultFormatter.Format(string(t.Name), s)
+	}
+	//if t.Selector != nil {
+	//	sel := t.Selector
+	//	if sel.Package == "time" && sel.TypeName == "Time" {
+	//		return fmt.Sprintf("timestamp.Timestamp")
+	//	}
+	//}
+
+	return ""
+}
+
+func (t Type) GetProtoType() string {
+	if t.IsPrimitivePointer() {
+		return format.BasicProtoTypeFormatter.Format(string(t.Pointer.InnerType.Name))
+	} else if t.IsPrimitive {
+		return format.BasicProtoTypeFormatter.Format(string(t.Name))
 	}
 
 	return ""
@@ -96,16 +142,19 @@ func (t Type) GetActualTypeName(upperCase bool) string {
 	}
 }
 
-func (t Type) GetParamTypeName(pack string) string {
+func (t Type) GetParamTypeName(pack string, reverse bool) string {
 	if t.Pointer != nil {
-		return "*" + t.Pointer.InnerType.GetParamTypeName(pack)
+		return "*" + t.Pointer.InnerType.GetParamTypeName(pack, reverse)
 	} else if t.Slice != nil {
-		return "[]" + t.Slice.InnerType.GetParamTypeName(pack)
+		return "[]" + t.Slice.InnerType.GetParamTypeName(pack, reverse)
 	} else if t.Selector != nil {
 		s := t.Selector
-		return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+		if !reverse {
+			return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+		}
 	} else if t.IsPrimitivePointer() {
-		return t.GetWrapperName(false)
+		toPointer := false
+		return t.GetWrapperName(&toPointer, false)
 	} else if t.IsPrimitive {
 		return string(t.Name)
 	}
@@ -117,20 +166,24 @@ func (t Type) GetParamTypeName(pack string) string {
 	return string(t.Name)
 }
 
-func (t Type) GetReturnTypeName(pack string, toPointer bool) string {
-	return t.getReturnTypeInner(pack, false, toPointer)
+func (t Type) GetReturnTypeName(pack string, toPointer *bool, reverse bool) string {
+	return t.getReturnTypeInner(pack, false, toPointer, reverse)
 }
 
-func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer bool) string {
+func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer *bool, reverse bool) string {
 	sign := getPointerSign(toPointer)
 
 	if t.IsPrimitivePointer() {
-		return t.GetWrapperName(toPointer)
+		if reverse {
+			return sign + string(t.Pointer.InnerType.Name)
+		} else {
+			return t.GetWrapperName(toPointer, reverse)
+		}
 	} else if t.Pointer != nil {
 		it := t.Pointer.InnerType
-		return sign + it.getReturnTypeInner(pack, it.Struct != nil, toPointer)
+		return sign + it.getReturnTypeInner(pack, it.Struct != nil, toPointer, reverse)
 	} else if t.Struct != nil && !skipStructure {
-		return sign + t.getReturnTypeInner(pack, true, toPointer)
+		return sign + t.getReturnTypeInner(pack, true, toPointer, reverse)
 	} else if t.Slice != nil {
 		var ps string
 		t := t.Slice.InnerType
@@ -138,13 +191,21 @@ func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer bool
 			ps = sign
 		}
 
-		return fmt.Sprintf("[]%s%s", ps, t.getReturnTypeInner(pack, true, toPointer))
+		return fmt.Sprintf("[]%s%s", ps, t.getReturnTypeInner(pack, true, toPointer, reverse))
 		//return "[]" + t.Slice.InnerType.GetReturnTypeName(pack)
 	} else if t.Selector != nil {
-		s := t.Selector
-		return fmt.Sprintf("%v.%v", s.Package, s.TypeName)
+		sel := t.Selector
+		if sel.Package == "time" && sel.TypeName == "Time" {
+			if reverse {
+				return fmt.Sprintf("time.Time")
+			} else {
+				return fmt.Sprintf("timestamp.Timestamp")
+			}
+		}
 	} else if t.IsPrimitive {
-		return string(t.Name)
+		return format.BasicProtoTypeFormatter.Format(string(t.Name))
+		//formatter.Format(string(f.Type.Name), n)
+		//return string(t.Name)
 	}
 
 	if pack != "" {
@@ -156,6 +217,15 @@ func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer bool
 
 type Pointer struct {
 	InnerType *Type
+}
+
+func (p *Pointer) ToBool() *bool {
+	if p == nil {
+		return nil
+	}
+
+	res := true
+	return &res
 }
 
 type Slice struct {
@@ -192,12 +262,12 @@ func (f Field) GetActualTypeName(upperCase bool) string {
 	return f.Type.GetActualTypeName(upperCase)
 }
 
-func (f Field) GetParamTypeName(pack string) string {
-	return f.Type.GetParamTypeName(pack)
+func (f Field) GetParamTypeName(pack string, reverse bool) string {
+	return f.Type.GetParamTypeName(pack, reverse)
 }
 
-func (f Field) GetReturnTypeName(pack string, toPointer bool) string {
-	return f.Type.GetReturnTypeName(pack, toPointer)
+func (f Field) GetReturnTypeName(pack string, toPointer *bool, reverse bool) string {
+	return f.Type.GetReturnTypeName(pack, toPointer, reverse)
 }
 
 func (f Field) IsExported() bool {
@@ -221,6 +291,8 @@ func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 		formatter = format.ProtoFormatter
 	case "go":
 		formatter = format.GoFormatter
+	case "default":
+		formatter = format.DefaultFormatter
 	}
 
 	if formatter != nil {
@@ -262,10 +334,14 @@ type Subscription struct {
 type Selector struct {
 	Package  string
 	TypeName TypeName
+	Type     *Type
 }
 
-func getPointerSign(toPointer bool) string {
-	if toPointer {
+func getPointerSign(toPointer *bool) string {
+	if toPointer == nil {
+		return ""
+	}
+	if *toPointer {
 		return "*"
 	}
 	return "&"

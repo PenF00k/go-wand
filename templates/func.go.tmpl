@@ -5,6 +5,8 @@
         {{- template "gen_primitive" . -}}
     {{- else if .IsPrimitivePointer -}}
         {{- template "gen_wrapped_primitive" . -}}
+    {{- else if .Selector -}}
+        {{- template "gen_selector" . -}}
     {{- else if .Struct -}}
         {{- template "gen_struct" . -}}
     {{- else if .Slice -}}
@@ -15,19 +17,35 @@
 {{ end -}}
 
 {{- define "gen_primitive" }}
-    gen{{ .GetGenFuncName }} := func(data {{ .Name }}) {{ .GetWrapperName true }} {
+    gen{{ .GetGenFuncName }} := func(data {{ .Name }}) {{ .GetWrapperName (toBoolPointer true) false }} {
         return {{ .WrapToProtoType "data" }}
     }
 {{ end -}}
 
 {{- define "gen_wrapped_primitive" }}
-    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName "" }}) {{ .GetWrapperName true }} {
+    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName "" false }}) {{ .GetWrapperName (toBoolPointer true) false }} {
         if data == nil {
             return nil
         }
 
-        return {{ .GetWrapperName false }}{
+        return {{ .GetWrapperName (toBoolPointer false) false }}{
             Value: {{ .WrapToProtoType "*data" }},
+        }
+    }
+{{ end -}}
+
+{{- define "gen_selector" }}
+    {{/*{{ if and eq .Selector.Package "time" eq .Selector.TypeName "Time" }}*/}}
+    {{ if eq .Selector.Package "time" }}
+        {{- template "gen_time" . -}}
+    {{ end }}
+{{ end -}}
+
+{{- define "gen_time" }}
+    genTimeTime := func(data time.Time) *timestamp.Timestamp {
+        return &timestamp.Timestamp{
+            Nanos:   int32(data.Nanosecond()),
+            Seconds: int64(data.Nanosecond()),
         }
     }
 {{ end -}}
@@ -37,8 +55,8 @@
     {{- $Package := "client" -}}
     {{ $ProtoPackageName := "proto_client" -}}
 
-    gen{{ $UpperCaseName }} := func(data {{ .GetParamTypeName $Package }}) {{ .GetReturnTypeName $ProtoPackageName true }} {
-        res := {{ .GetReturnTypeName $ProtoPackageName false }}{
+    gen{{ $UpperCaseName }} := func(data {{ .GetParamTypeName $Package false }}) {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }} {
+        res := {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer false) false }}{
         {{ range $item := .Struct.Fields }}
             {{- if $item.IsExported -}}
             {{ $item.GetUpperCamelCaseName "" "" }}: gen{{ .Type.GetGenFuncName }}(data.{{ $item.Name }}),
@@ -54,8 +72,8 @@
     {{- $Package := "client" -}}
     {{- $ProtoPackageName := "proto_client" -}}
 
-    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName $Package }}) {{ .GetReturnTypeName $ProtoPackageName true }} {
-        res := make({{ .GetReturnTypeName $ProtoPackageName true }}, 0, len(data))
+    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName $Package false }}) {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }} {
+        res := make({{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }}, 0, len(data))
 
         for _, v := range data {
             {{ if .Slice.InnerType.Pointer -}}
@@ -76,13 +94,118 @@
     {{- $Package := "client" -}}
     {{- $ProtoPackageName := "proto_client" -}}
 
-    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName $Package }}) {{ .GetReturnTypeName $ProtoPackageName true }} {
+    gen{{ .GetGenFuncName }} := func(data {{ .GetParamTypeName $Package false }}) {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }} {
         if data == nil {
             return nil
         }
 
         res := gen{{ .Pointer.InnerType.GetGenFuncName }}(*data)
         return res
+    }
+{{ end -}}
+
+
+
+{{- define "gen_field_reverse" }}
+    {{ if .IsPrimitive -}}
+        {{- template "gen_primitive_reverse" . -}}
+    {{- else if .IsPrimitivePointer -}}
+        {{- template "gen_wrapped_primitive_reverse" . -}}
+    {{- else if .Selector -}}
+        {{- template "gen_selector_reverse" . -}}
+    {{- else if .Struct -}}
+        {{- template "gen_struct_reverse" . -}}
+    {{- else if .Slice -}}
+        {{- template "gen_slice_reverse" . -}}
+    {{- else if .Pointer -}}
+        {{- template "gen_pointer_reverse" . -}}
+    {{- end -}}
+{{ end -}}
+
+{{- define "gen_primitive_reverse" }}
+    genArg{{ .GetGenFuncName }} := func(data {{ .GetWrapperName (toBoolPointer false) true }}) {{ .Name }} {
+        return {{ .WrapToDefaultGoType "data" }}
+    }
+{{ end -}}
+
+{{- define "gen_wrapped_primitive_reverse" }}
+    {{- $Package := "client" -}}
+
+    genArg{{ .GetGenFuncName }} := func(data {{ .GetWrapperName (toBoolPointer true) true }}) {{ .GetReturnTypeName $Package (toBoolPointer true) true }} {
+        if data == nil {
+            return nil
+        }
+
+        res := data.Value
+        return &res
+    }
+{{ end -}}
+
+{{- define "gen_selector_reverse" }}
+    {{/*{{ if and eq .Selector.Package "time" eq .Selector.TypeName "Time" }}*/}}
+    {{ if eq .Selector.Package "time" }}
+        {{- template "gen_time_reverse" . -}}
+    {{ end }}
+{{ end -}}
+
+{{- define "gen_time_reverse" }}
+    genArgTimeTime := func(data *timestamp.Timestamp) time.Time {
+        t := time.Date(0,0, 0, 0, 0, int(data.Seconds), int(data.Nanos), nil)
+        return t
+    }
+{{ end -}}
+
+{{- define "gen_struct_reverse" }}
+    {{- $UpperCaseName := .Name.ToUpperCamelCase -}}
+    {{- $Package := "client" -}}
+    {{ $ProtoPackageName := "proto_client" -}}
+
+    genArg{{ $UpperCaseName }} := func(data {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }}) {{ .GetReturnTypeName $Package nil false }} {
+    res := {{ .GetReturnTypeName $Package nil false }}{
+    {{ range $item := .Struct.Fields }}
+        {{- if $item.IsExported -}}
+            {{ $item.GetUpperCamelCaseName "" "" }}: genArg{{ .Type.GetGenFuncName }}(data.{{ $item.Name }}),
+        {{ end -}}
+    {{ end }}
+    }
+
+    return res
+    }
+{{ end -}}
+
+{{- define "gen_slice_reverse" }}
+    {{- $Package := "client" -}}
+    {{- $ProtoPackageName := "proto_client" -}}
+
+    genArg{{ .GetGenFuncName }} := func(data {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }}) {{ .GetReturnTypeName $Package nil true }} {
+    res := make({{ .GetReturnTypeName $Package nil true }}, 0, len(data))
+
+    for _, v := range data {
+    {{ if .Slice.InnerType.Pointer -}}
+        if v == nil {
+        res = append(res, nil)
+        continue
+        }
+    {{ end -}}
+        d := genArg{{ .Slice.InnerType.GetGenFuncName }}({{ if .IsPointer }}*{{ end }}v)
+        res = append(res, d)
+    }
+
+    return res
+    }
+{{ end -}}
+
+{{- define "gen_pointer_reverse" }}
+    {{- $Package := "client" -}}
+    {{- $ProtoPackageName := "proto_client" -}}
+
+    genArg{{ .GetGenFuncName }} := func(data {{ .GetReturnTypeName $ProtoPackageName (toBoolPointer true) false }}) {{ .GetReturnTypeName $Package (toBoolPointer true) true }} {
+        if data == nil {
+            return nil
+        }
+
+        res := genArg{{ .Pointer.InnerType.GetGenFuncName }}({{ if .Pointer.InnerType.IsPointer }}*{{ end }}data)
+        return &res
     }
 {{ end -}}
 
@@ -94,7 +217,7 @@ func {{ .Function.FunctionName }}(argsBytes []byte, callback goapi.EventCallback
         return nil, err
     }
 
-    return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" }}, {{ end }}func(data {{ .GetEventTypeName }}) {
+    return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "default" }}, {{ end }}func(data {{ .GetEventTypeName }}) {
         {{ range $i, $item := .FlatFields -}}
             //{{ $i }}
             {{- template "gen_field" $item }}
@@ -123,8 +246,9 @@ func getEventName{{ .Function.FunctionName }}(argsBytes []byte) (string, error) 
     return fullName, nil
 }
 {{ else if .Function.IsPure }}
-
+// function is pure: {{ .Function }}
 {{ else }}
+{{/*{{- $LastArgFunctionName := .GetLastArgFunctionName -}}*/}}
 func callAdapterFor{{ .Function.FunctionName }}(argsBytes []byte, callback goapi.FuncCallback) {
     args := {{ $ProtoPackageName }}.{{ .Function.FunctionName }}Args{}
 
@@ -133,8 +257,14 @@ func callAdapterFor{{ .Function.FunctionName }}(argsBytes []byte, callback goapi
         return
     }
 
+    {{ range $i, $item := .FlatArgFields -}}
+        //{{ $i }}
+        {{- template "gen_field_reverse" $item }}
+    {{ end }}
+
     res, err := {{ .Package }}.{{ .Function.FunctionName }}(
-    {{- range $i, $item := $Args }}{{ $item.GetUpperCamelCaseName "args." "go" -}}
+    {{- range $i, $item := $Args -}}
+        genArg{{ $item.Type.GetGenFuncName }}(args.{{ $item.ToUpperCamelCase }})
     {{- if .NotIsLastField $Args $i }}, {{- end -}}
     {{- end }})
     if err != nil {

@@ -242,7 +242,7 @@ func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 func createFunctionData(funcDecl *ast.FuncDecl) generator.FunctionData {
 	comments := getComments(funcDecl.Doc)
 	isSubscription := checkIsSubscription(funcDecl.Type)
-	isPure := funcDecl.Type.Results.List == nil || len(funcDecl.Type.Results.List) == 0
+	isPure := funcDecl.Type.Results == nil || funcDecl.Type.Results.List == nil || len(funcDecl.Type.Results.List) == 0
 	name := funcDecl.Name.Name
 	args := funcDecl.Type.Params
 	returnValues := funcDecl.Type.Results

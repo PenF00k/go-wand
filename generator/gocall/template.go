@@ -8,12 +8,13 @@ import (
 )
 
 type TemplateStructData struct {
-	Fields     []adapter.Field
-	FlatFields []*adapter.Type
-	Adapter    *adapter.Adapter
-	CodeList   *generator.CodeList
-	Function   adapter.Function
-	Package    string
+	Fields        []adapter.Field
+	FlatArgFields []*adapter.Type
+	FlatFields    []*adapter.Type
+	Adapter       *adapter.Adapter
+	CodeList      *generator.CodeList
+	Function      adapter.Function
+	Package       string
 	//Types   []TemplateProtoTypeData
 }
 
@@ -36,12 +37,31 @@ func (t TemplateStructData) GetLastFunction() *adapter.Type {
 	return t.FlatFields[len(t.FlatFields)-1]
 }
 
+func (t TemplateStructData) GetLastArgFunctionName(index int) string {
+	if t.FlatArgFields == nil || len(t.FlatArgFields) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%v%v", t.FlatArgFields[len(t.FlatArgFields)-1].GetGenFuncName(),  index)
+}
+
 //func (t TemplateStructData) GetEventTypeName() string {
 //	return fmt.Sprintf("return %v.%v(", t.Package, t.Function.ReturnValues[0].Type.Name)
 //	   return {{ .Package }}.{{ .Function.FunctionName }}({{ range $item := .Function.Args }}{{ $item.GetUpperCamelCaseName "args." "go" $item.Type.IsPrimitive }}, {{ end }}func(data *{{ .Package }}.{{ .GetEventTypeName }}) {
 //}
 
-func flattenFieldsResult(returnedFields []adapter.Field) []*adapter.Type {
+func flattenArgFieldsResult(args []adapter.Field) []*adapter.Type {
+	flatten := make([]*adapter.Type, 0, 10)
+	unique := make(map[*adapter.Type]bool)
+
+	for _, v := range args {
+		f := flattenType(v.Type, unique)
+		flatten = append(flatten, f...)
+	}
+
+	return flatten
+}
+
+func flattenResultFieldsResult(returnedFields []adapter.Field) []*adapter.Type {
 	flatten := make([]*adapter.Type, 0, 10)
 	unique := make(map[*adapter.Type]bool)
 
