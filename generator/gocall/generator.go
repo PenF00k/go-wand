@@ -13,42 +13,6 @@ import (
 	"text/template"
 )
 
-//func (f Field) NotIsLastField(list []Field, i int) bool {
-//	return i != len(list)-1
-//}
-//
-//func (f Field) GetUpperCamelCaseName(prefix string, target string, isPrimitive bool) string {
-//	n := prefix + strcase.ToCamel(f.Name)
-//
-//	if isPrimitive {
-//		n += ".Value"
-//	}
-//
-//	if target == "" {
-//		return n
-//	}
-//
-//	var formatter fieldFormatter
-//	switch target {
-//	case "pro":
-//		formatter = ProtoFormatter
-//	case "go":
-//		formatter = GoFormatter
-//	}
-//
-//	if formatter != nil {
-//		n = formatter.format(f.Type, n)
-//	}
-//
-//	return n
-//}
-//
-//func (f Field) GetLowerCamelCaseName() string {
-//	n := strcase.ToLowerCamel(f.Name)
-//
-//	return n
-//}
-
 type GoCodeGenerator struct {
 	outDirectory string
 	Package      string

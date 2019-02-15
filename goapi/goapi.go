@@ -60,14 +60,17 @@ func (registry *Registry) RegisterSubscription(subscriptionName string, subFunc 
 }
 
 func (registry *Registry) RegisterFunction(functionName string, adapterFunction CallFunc) {
+	log.Infof("Registry RegisterFunction '%v'", functionName)
 	registry.functions[functionName] = adapterFunction
 }
 
 func (registry *Registry) RegisterEventCallback(callback Event) {
+	log.Infof("Registry RegisterEventCallback '%v'", callback)
 	registry.subscriptionRegistry.SetCallback(callback)
 }
 
 func (registry *Registry) Subscribe(subscriptionName string, args []byte) (string, error) {
+	log.Infof("Registry Subscribe '%v'", subscriptionName)
 	adapter := registry.subscriptions[subscriptionName]
 	if adapter == nil {
 		return "", fmt.Errorf("no adapter for event %s", subscriptionName)
@@ -83,6 +86,7 @@ func (registry *Registry) Subscribe(subscriptionName string, args []byte) (strin
 }
 
 func (registry *Registry) CancelSubscription(fullSubscriptionName string) {
+	log.Infof("Registry CancelSubscription '%v'", fullSubscriptionName)
 	subscriptionName := strings.Split(fullSubscriptionName, ":")[0]
 	adapter := registry.subscriptions[subscriptionName]
 	if adapter != nil {
@@ -107,7 +111,7 @@ func (registry *Registry) Call(methodName string, args []byte, callback FuncCall
 	functionCall := registry.functions[methodName]
 	if functionCall != nil {
 		log.Printf("[CALL] methodName %s", methodName)
-		go functionCall(args, callback)
+		functionCall(args, callback)
 	} else {
 		log.Errorf("methodName not found %s", methodName)
 		callback.OnError("no such method: " + methodName)
