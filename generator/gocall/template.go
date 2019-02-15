@@ -21,8 +21,12 @@ type TemplateStructData struct {
 func (t TemplateStructData) GetEventTypeName() string {
 	var name string
 	var star string
+	pkg := t.Package + "."
 	rvt := t.Function.ReturnValues[0].Type
 	//t.Function.ReturnValues[0].Type.Pointer.InnerType.Name
+	if rvt.IsPrimitivePointer() {
+		pkg = ""
+	}
 	if rvt.Pointer != nil {
 		name = string(rvt.Pointer.InnerType.Name)
 		star = "*"
@@ -30,7 +34,7 @@ func (t TemplateStructData) GetEventTypeName() string {
 		name = string(rvt.Name)
 		star = ""
 	}
-	return fmt.Sprintf("%v%v.%v", star, t.Package, name)
+	return fmt.Sprintf("%v%v%v", star, pkg, name)
 }
 
 func (t TemplateStructData) GetLastFunction() *adapter.Type {

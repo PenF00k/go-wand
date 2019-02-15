@@ -246,7 +246,18 @@ func getEventName{{ .Function.FunctionName }}(argsBytes []byte) (string, error) 
     return fullName, nil
 }
 {{ else if .Function.IsPure }}
-// function is pure: {{ .Function }}
+// function is pure
+func {{ .Function.FunctionName }}(
+    {{- range $index, $item := $Args }}
+    {{- $item.Name }} {{ .GetReturnTypeName "" (toBoolPointer .Type.IsPointer) false }}
+    {{- if .NotIsLastField $Args $index }}, {{ end }}
+    {{- end }}) {
+    {{ .Package }}.{{ .Function.FunctionName }}(
+    {{- range $index, $item := $Args }}
+    {{- $item.Name }}
+    {{- if .NotIsLastField $Args $index }}, {{ end -}}
+    {{end}})
+}
 {{ else }}
 {{/*{{- $LastArgFunctionName := .GetLastArgFunctionName -}}*/}}
 func callAdapterFor{{ .Function.FunctionName }}(argsBytes []byte, callback goapi.FuncCallback) {
@@ -265,7 +276,7 @@ func callAdapterFor{{ .Function.FunctionName }}(argsBytes []byte, callback goapi
     res, err := {{ .Package }}.{{ .Function.FunctionName }}(
     {{- range $i, $item := $Args -}}
         genArg{{ $item.Type.GetGenFuncName }}(args.{{ $item.ToUpperCamelCase }})
-    {{- if .NotIsLastField $Args $i }}, {{- end -}}
+    {{- if .NotIsLastField $Args $i }}, {{ end -}}
     {{- end }})
     if err != nil {
         callback.OnError(err.Error())
