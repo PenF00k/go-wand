@@ -39,16 +39,19 @@ type Structure struct {
 type JsCodeGenerator struct {
 	outDirectory string
 	packageName  string
+	Source       *generator.CodeList
 }
 
-func New(outDirectory string, packageName string) generator.Generator {
+func New(source *generator.CodeList, outDirectory string, packageName string) generator.Generator {
 	return &JsCodeGenerator{
 		outDirectory: outDirectory,
 		packageName:  packageName,
+		Source:       source,
 	}
 }
 
-func (generator JsCodeGenerator) CreateCode(source *generator.CodeList) error {
+func (generator JsCodeGenerator) CreateCode() error {
+	source := generator.Source
 	err := generator.writeGeneral(source)
 	if err != nil {
 		return err

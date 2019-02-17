@@ -5,3 +5,6 @@ wrapper:
   port: 9009
 proto:
   path: proto_generated
+flutter:
+  generated_proto_path: ../client/cliwand2-demo/dart/generated
+  app_package: client_pik_remont

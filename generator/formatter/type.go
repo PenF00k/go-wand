@@ -7,6 +7,7 @@ type TypeFormatter interface {
 var PointerTypeFormatter = pointerTypeFormatter{}
 var BasicProtoTypeFormatter = basicProtoTypeFormatter{}
 var BasicGoTypeFormatter = basicGoTypeFormatter{}
+var BasicDartTypeFormatter = basicDartTypeFormatter{}
 
 type pointerTypeFormatter struct{}
 
@@ -70,7 +71,6 @@ func (f basicProtoTypeFormatter) Format(TypeName string) string {
 	return TypeName
 }
 
-
 type basicGoTypeFormatter struct{}
 
 func (f basicGoTypeFormatter) Format(TypeName string) string {
@@ -81,6 +81,35 @@ func (f basicGoTypeFormatter) Format(TypeName string) string {
 		fallthrough
 	case "int16":
 		return "int32"
+	}
+
+	return TypeName
+}
+
+type basicDartTypeFormatter struct{}
+
+func (f basicDartTypeFormatter) Format(TypeName string) string {
+	switch TypeName {
+	case "float32":
+		fallthrough
+	case "float64":
+		return "double"
+	case "int":
+		fallthrough
+	case "int8":
+		fallthrough
+	case "int16":
+		fallthrough
+	case "int32":
+		fallthrough
+	case "int64":
+		return "int"
+	case "bool":
+		return "bool"
+	case "string":
+		return "String"
+		//case "time.Time":
+		//	return "google.protobuf.Timestamp"
 	}
 
 	return TypeName

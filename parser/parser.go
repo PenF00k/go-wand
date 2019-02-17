@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"gitlab.vmassive.ru/wand/generator"
+	"gitlab.vmassive.ru/wand/generator/dart"
 	"gitlab.vmassive.ru/wand/generator/gocall"
 	"gitlab.vmassive.ru/wand/generator/proto"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -50,10 +53,16 @@ func Parse(codeList *generator.CodeList) {
 		}
 
 		generateGoFilesFromProto(codeList, packageName)
+		generateDartFilesFromProto(codeList, packageName)
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName, ad, codeList)
 		if err := goGen.CreateCode(); err != nil {
 			log.Errorf("error while generating go code")
+		}
+
+		dartGen := dart.New(codeList.PathMap.FlutterGenerated, packageName, ad, codeList)
+		if err := dartGen.CreateCode(); err != nil {
+			log.Errorf("error while generating dart code")
 		}
 	} else {
 		log.Printf("no changes, skipping")
@@ -64,8 +73,8 @@ func parseStructures(codeList *generator.CodeList, pkgs map[string]*ast.Package,
 	for name, pkg := range pkgs {
 		packageName = name
 
-		for name, file := range pkg.Files {
-			log.Printf("file %s", name)
+		for _, file := range pkg.Files {
+			//log.Printf("file %s", name)
 			cmap := ast.NewCommentMap(fset, file, file.Comments)
 			file.Comments = cmap.Comments()
 
@@ -231,7 +240,7 @@ func parseFunctions(codeList *generator.CodeList, pkgs map[string]*ast.Package, 
 
 func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 	if !funcDecl.Name.IsExported() {
-		log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
+		//log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
 		return
 	}
 
@@ -298,10 +307,41 @@ func hasChanges(newState *generator.CodeList, oldState *generator.CodeList) bool
 }
 
 func generateGoFilesFromProto(codeList *generator.CodeList, packageName string) {
-	cmd := exec.Command("protoc", "--go_out=.", packageName+".proto")
-	cmd.Dir = codeList.PathMap.Proto
+	generateFilesFromProto(codeList, packageName, "go", codeList.PathMap.Proto)
+}
 
-	log.Infof("executing protoc in dir %v, packageName = %v", cmd.Dir, packageName)
+func generateDartFilesFromProto(codeList *generator.CodeList, packageName string) {
+	generateFilesFromProto(codeList, packageName, "dart", codeList.PathMap.FlutterGenerated)
+}
+
+func generateFilesFromProto(codeList *generator.CodeList, packageName, target, outDir string) {
+	execDir := codeList.PathMap.Proto
+
+	if target != "go" {
+		protoFilesPath := path.Join(execDir, "*.proto")
+		files, err := filepath.Glob(protoFilesPath)
+		if err != nil {
+			log.Errorf("couldn't get proto files from dir with error: %v", err)
+		} else {
+			for _, v := range files {
+				generateFileFromProto(codeList, packageName, target, outDir, v)
+			}
+		}
+	} else {
+		protoSource := packageName + ".proto"
+		generateFileFromProto(codeList, packageName, target, outDir, protoSource)
+	}
+}
+
+func generateFileFromProto(codeList *generator.CodeList, packageName, target, outDir, protoSource string) {
+	execDir := codeList.PathMap.Proto
+	targetFlag := fmt.Sprintf("--%s_out=%s", target, outDir)
+	protoPathFlag := fmt.Sprintf("--proto_path=%s", execDir)
+
+	cmd := exec.Command("protoc", protoPathFlag, protoSource, targetFlag)
+	cmd.Dir = execDir
+
+	log.Infof("executing protoc in dir '%v', packageName = '%v', target = '%v', outDir = '%v', protoPathFlag = '%v' \n protoSource = '%v'", cmd.Dir, packageName, target, outDir, protoPathFlag, protoSource)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer

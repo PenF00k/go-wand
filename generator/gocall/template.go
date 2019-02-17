@@ -45,7 +45,7 @@ func (t TemplateStructData) GetLastArgFunctionName(index int) string {
 	if t.FlatArgFields == nil || len(t.FlatArgFields) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%v%v", t.FlatArgFields[len(t.FlatArgFields)-1].GetGenFuncName(),  index)
+	return fmt.Sprintf("%v%v", t.FlatArgFields[len(t.FlatArgFields)-1].GetGenFuncName(), index)
 }
 
 //func (t TemplateStructData) GetEventTypeName() string {
@@ -91,6 +91,8 @@ func flattenType(typ *adapter.Type, unique map[*adapter.Type]bool) []*adapter.Ty
 	} else if typ.Slice != nil {
 		f := flattenType(typ.Slice.InnerType, unique)
 		flatten = append(flatten, f...)
+	} else if typ.Selector != nil && typ.Selector.IsTime() {
+		//просто добавляем
 	} else {
 		log.Warnf("unwanted type %+v", typ)
 	}

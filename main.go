@@ -90,16 +90,27 @@ func runApplication(configName string, dev bool) {
 	protoRelPath := path.Join(configuration.Wrapper.Package, "proto")
 	createDirectory(protoPath)
 
+	workingDir, err := os.Getwd()
+	if err != nil {
+		log.Errorf("couldn't get current working dir")
+	}
+
+	flutterGeneratedPathRelative := configuration.Flutter.GeneratedProtoPath
+	flutterGeneratedPath := path.Join(workingDir, flutterGeneratedPathRelative)
+
 	pathMap := generator.PathMap{
-		Source:   fullGoSourcePath,
-		Target:   targetGoCallPath,
-		Js:       configuration.Js.Path,
-		Proto:    protoPath,
-		ProtoRel: protoRelPath,
+		Source:              fullGoSourcePath,
+		Target:              targetGoCallPath,
+		Js:                  configuration.Js.Path,
+		FlutterGenerated:    flutterGeneratedPath,
+		FlutterGeneratedRel: flutterGeneratedPathRelative,
+		Proto:               protoPath,
+		ProtoRel:            protoRelPath,
 	}
 
 	packageMap := generator.PackageMap{
-		ProtoPackageName: "proto_client",
+		ProtoPackageName:  "proto_client",
+		FlutterAppPackage: configuration.Flutter.AppPackage,
 	}
 
 	goPackageName := configuration.Wrapper.Package

@@ -15,6 +15,18 @@ func (tn TypeName) ToUpperCamelCase() string {
 	return strcase.ToCamel(string(tn))
 }
 
+func (tn TypeName) ToLowerCamelCase() string {
+	return strcase.ToLowerCamel(string(tn))
+}
+
+func (sn StructName) ToUpperCamelCase() string {
+	return strcase.ToCamel(string(sn))
+}
+
+func (sn StructName) ToLowerCamelCase() string {
+	return strcase.ToLowerCamel(string(sn))
+}
+
 type Adapter struct {
 	Structures    []Struct
 	Functions     []Function
@@ -36,7 +48,6 @@ type Type struct {
 func (t Type) IsPrimitivePointer() bool {
 	return t.Pointer != nil && t.Pointer.InnerType.IsPrimitive
 }
-
 
 func (t Type) IsPointer() bool {
 	return t.Pointer != nil
@@ -195,7 +206,7 @@ func (t Type) getReturnTypeInner(pack string, skipStructure bool, toPointer *boo
 		//return "[]" + t.Slice.InnerType.GetReturnTypeName(pack)
 	} else if t.Selector != nil {
 		sel := t.Selector
-		if sel.Package == "time" && sel.TypeName == "Time" {
+		if sel.IsTime() {
 			if reverse {
 				return fmt.Sprintf("time.Time")
 			} else {
@@ -304,7 +315,6 @@ func (f Field) GetUpperCamelCaseName(prefix string, target string) string {
 
 func (f Field) GetLowerCamelCaseName() string {
 	n := strcase.ToLowerCamel(f.Name)
-
 	return n
 }
 
@@ -323,6 +333,10 @@ type Function struct {
 	//Comments       []string
 }
 
+func (f Function) GetLowerCaseName() string {
+	return strcase.ToLowerCamel(f.FunctionName)
+}
+
 type Primitive struct {
 	TypeName TypeName
 }
@@ -335,6 +349,10 @@ type Selector struct {
 	Package  string
 	TypeName TypeName
 	Type     *Type
+}
+
+func (s *Selector) IsTime() bool {
+	return s.Package == "time" && s.TypeName == "Time"
 }
 
 func getPointerSign(toPointer *bool) string {

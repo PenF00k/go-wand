@@ -1,0 +1,85 @@
+{{- if .Function.IsSubscription }}
+{{- $ReturnTypeName := .GetReturnTypeName }}
+{{- $FuncName := .Function.FunctionName }}
+{{- $WithFuncName := .GetWithFunctionName }}
+{{- $FuncNameLower := .Function.GetLowerCaseName }}
+class With{{ $WithFuncName }} extends MaterialDartLib.StatefulWidget {
+  final MaterialDartLib.WidgetBuilder builder;
+  {{- range $item := .Function.Args }}
+  {{ GetDartClassFieldForArg $item }}
+  {{- end }}
+
+  const With{{ $WithFuncName }}({MaterialDartLib.Key key, this.builder{{ range $item := .Function.Args }}{{ GetDartClassConstructorPartForArg $item }}{{ end -}} })
+      : {{- range $item := .Function.Args -}}
+        {{ GetDartClassAssertForArg $item }}
+        {{- end }}
+        super(key: key);
+
+  @override
+  _With{{ $WithFuncName }}State createState() => _With{{ $WithFuncName }}State();
+
+  static _With{{ $WithFuncName }}State of(MaterialDartLib.BuildContext context) {
+    return (context.inheritFromWidgetOfExactType(_With{{ $WithFuncName }}StateInheritedWidget)
+            as _With{{ $WithFuncName }}StateInheritedWidget)
+        ?.data;
+  }
+}
+
+class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFuncName }}> {
+  String _subscriptionId;
+  {{ $ReturnTypeName }} data;
+
+  void setData({{ $ReturnTypeName }} data) {
+    setState(() {
+      this.data = data;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    apiCaller.{{ .GetCallFunctionNameForSubscription }}({{ .GetCallFunctionArgsForSubscription false }}).then((data) {
+      setData(data);
+    });
+
+    var callback = ({{ $ReturnTypeName }} result) {
+      setData(result);
+    };
+
+    apiCaller.{{ $FuncNameLower }}({{ .GetCallFunctionArgsForSubscription true }}).then((id) {
+      _subscriptionId = id;
+    });
+  }
+
+  @override
+  void dispose() {
+    apiCaller.unsubscribe(_subscriptionId);
+    super.dispose();
+  }
+
+  void unsubscribe() {
+    apiCaller.unsubscribe(_subscriptionId);
+  }
+
+  @override
+  MaterialDartLib.Widget build(MaterialDartLib.BuildContext context) {
+    return _With{{ $WithFuncName }}StateInheritedWidget(
+      data: this,
+      child: MaterialDartLib.Builder(builder: (context) => widget.builder(context)),
+    );
+  }
+}
+
+class _With{{ $WithFuncName }}StateInheritedWidget extends MaterialDartLib.InheritedWidget {
+  final _With{{ $WithFuncName }}State data;
+
+  _With{{ $WithFuncName }}StateInheritedWidget({MaterialDartLib.Key key, this.data, MaterialDartLib.Widget child})
+      : super(key: key, child: child);
+
+  @override
+  bool updateShouldNotify(_With{{ $WithFuncName }}StateInheritedWidget old) {
+    return old.data != data;
+  }
+}
+{{ end }}

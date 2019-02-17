@@ -1,0 +1,23 @@
+{{- $GeneratedPackagePath := .GetDartGeneratedPath -}}
+import 'dart:typed_data';
+
+import 'package:{{ $GeneratedPackagePath }}/client.pb.dart';
+import 'package:client_pik_remont/go_client/proto_call.dart';
+import 'package:flutter/material.dart' as MaterialDartLib;
+import 'package:flutter/services.dart';
+
+const platform = const MethodChannel("ru.pikremont.clientpikremont.CHANNEL");
+
+GoApiCaller apiCaller = GoApiCaller(ProdGoApiCaller());
+
+Future<dynamic> handleMethod(MethodCall call) async {
+	switch (call.method) {
+		case "subscriptionEvent":
+			var args = call.arguments as Map<dynamic, dynamic>;
+			var fullSubscriptionName = args["fullSubscriptionName"];
+			var payload = args["payload"] as Uint8List;
+
+			apiCaller.onEvent(fullSubscriptionName, payload);
+			break;
+	}
+}

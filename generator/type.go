@@ -40,16 +40,19 @@ type FunctionData struct {
 }
 
 type PathMap struct {
-	Source   string
-	Target   string
-	Js       string
-	Proto    string
-	ProtoRel string
+	Source              string
+	Target              string
+	Js                  string
+	FlutterGenerated    string
+	FlutterGeneratedRel string
+	Proto               string
+	ProtoRel            string
 }
 
 type PackageMap struct {
-	PackageName      string
-	ProtoPackageName string
+	PackageName       string
+	ProtoPackageName  string
+	FlutterAppPackage string
 }
 
 func (list *CodeList) AddStructData(structure StructData) {

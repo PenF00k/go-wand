@@ -1,0 +1,31 @@
+{{- $ReturnTypeName := .GetReturnTypeName }}
+{{- $FuncName := .Function.FunctionName }}
+{{- $FuncNameLower := .Function.GetLowerCaseName }}
+{{- if .Function.IsSubscription }}
+Future<String> {{ $FuncNameLower }}({{ .GetSubscriptionArgsAsDartTypes }}) {
+    try {
+        SubscriptionBytesCallback callback = (Uint8List bytes) {
+            typedCallback({{ $ReturnTypeName }}.fromBuffer(bytes));
+        };
+
+        final args = {{ $FuncName }}Args(){{ .BindArgs }};
+
+        return apiCaller.subscribe("{{ $FuncName }}", args, callback);
+    } on PlatformException catch (e) {
+        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $e");
+        rethrow;
+    }
+}
+{{ else if .Function.IsPure }}
+{{ else }}
+Future<{{ $ReturnTypeName }}> {{ $FuncNameLower }}({{ .GetArgsAsDartTypes }}) async {
+    try {
+        final args = {{ $FuncName }}Args(){{ .BindArgs }};
+        final Uint8List bytes = await apiCaller.callMethod("{{ $FuncName }}", args);
+        return {{ $ReturnTypeName }}.fromBuffer(bytes);
+    } on PlatformException catch (e) {
+        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $e");
+        rethrow;
+    }
+}
+{{ end }}
