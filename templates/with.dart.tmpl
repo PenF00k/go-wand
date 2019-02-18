@@ -10,11 +10,7 @@ class With{{ $WithFuncName }} extends MaterialDartLib.StatefulWidget {
   {{- end }}
 
   With{{ $WithFuncName }}({MaterialDartLib.Key key, this.builder{{ range $item := .Function.Args }}{{ GetDartClassConstructorPartForArg $item }}{{ end -}} })
-      : {{/*{{- range $item := .Function.Args -}}
-        {{ GetDartClassAssertForArg $item }}
-        {{- end }}*/}}
-        {{/*{{- if true }}{{ end -}}*/}}
-        super(key: key);
+      : super(key: key);
 
   @override
   _With{{ $WithFuncName }}State createState() => _With{{ $WithFuncName }}State();
@@ -40,7 +36,7 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
   void initState() {
     super.initState();
 
-    subscribe();
+    {{ .IfArgValuesAreNotNil }}subscribe();
   }
 
   void subscribe() {
@@ -64,16 +60,15 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
   }
 
   void unsubscribe() {
-    apiCaller.unsubscribe(_subscriptionId);
+    if (_subscriptionData != null) apiCaller.unsubscribe(_subscriptionData);
   }
 
   {{- if .IfFunctionHasArgs }}
   @override
   void didUpdateWidget(With{{ $WithFuncName }} oldWidget) {
     super.didUpdateWidget(oldWidget);
-    //widget.projectID != oldWidget.projectID
     if ({{ .CompareOldAndNewArgs }}) {
-      unsubscribe()
+      unsubscribe();
       subscribe();
     }
   }

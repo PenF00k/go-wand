@@ -53,6 +53,32 @@ func (t TemplateStructData) CompareOldAndNewArgs() string {
 	return res.String()
 }
 
+func (t TemplateStructData) IfArgValuesAreNotNil() string {
+	if !t.IfFunctionHasArgs() {
+		return ""
+	}
+
+	return fmt.Sprintf("if (%s) ", t.ArgValuesAreNotNil())
+}
+
+func (t TemplateStructData) ArgValuesAreNotNil() string {
+	if !t.IfFunctionHasArgs() {
+		return ""
+	}
+
+	args := t.Function.Args
+	res := strings.Builder{}
+	for i, v := range args {
+		if i != 0 {
+			res.WriteString(" && ")
+		}
+		s := fmt.Sprintf("widget.%s != null", v.Name)
+		res.WriteString(s)
+	}
+
+	return res.String()
+}
+
 func (t TemplateStructData) IfFunctionHasArgs() bool {
 	return t.FunctionArgsLen() > 0
 }
