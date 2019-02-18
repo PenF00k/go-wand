@@ -2,7 +2,7 @@
 {{- $FuncName := .Function.FunctionName }}
 {{- $FuncNameLower := .Function.GetLowerCaseName }}
 {{- if .Function.IsSubscription }}
-Future<String> {{ $FuncNameLower }}({{ .GetSubscriptionArgsAsDartTypes }}) {
+Future<SubscriptionData> {{ $FuncNameLower }}({{ .GetSubscriptionArgsAsDartTypes }}) {
     try {
         SubscriptionBytesCallback callback = (Uint8List bytes) {
             typedCallback({{ $ReturnTypeName }}.fromBuffer(bytes));

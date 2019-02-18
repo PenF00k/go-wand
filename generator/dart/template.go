@@ -35,6 +35,32 @@ type TemplateStructData struct {
 	//Types   []TemplateProtoTypeData
 }
 
+func (t TemplateStructData) CompareOldAndNewArgs() string {
+	if !t.IfFunctionHasArgs() {
+		return ""
+	}
+
+	args := t.Function.Args
+	res := strings.Builder{}
+	for i, v := range args {
+		if i != 0 {
+			res.WriteString(" && ")
+		}
+		s := fmt.Sprintf("widget.%s != oldWidget.%[1]s", v.Name)
+		res.WriteString(s)
+	}
+
+	return res.String()
+}
+
+func (t TemplateStructData) IfFunctionHasArgs() bool {
+	return t.FunctionArgsLen() > 0
+}
+
+func (t TemplateStructData) FunctionArgsLen() int {
+	return len(t.Function.Args)
+}
+
 func (t TemplateStructData) GetReturnTypeName() string {
 	rv := t.Function.ReturnValues
 	if len(rv) == 0 || rv[0].Type == nil {
@@ -124,7 +150,9 @@ func (t TemplateStructData) GetSubscriptionArgsAsDartTypes() string {
 }
 
 func getDartType(goType *adapter.Type, toLower bool) string {
-	if goType.IsPointer() {
+	if goType.IsPrimitivePointer() {
+		return format.WrapperDartTypeFormatter.Format(string(goType.Pointer.InnerType.Name))
+	} else if goType.IsPointer() {
 		return getDartType(goType.Pointer.InnerType, toLower)
 	} else if goType.Struct != nil {
 		if toLower {

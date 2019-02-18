@@ -97,6 +97,7 @@ func runApplication(configName string, dev bool) {
 
 	flutterGeneratedPathRelative := configuration.Flutter.GeneratedProtoPath
 	flutterGeneratedPath := path.Join(workingDir, flutterGeneratedPathRelative)
+	createDirectory(flutterGeneratedPath)
 
 	pathMap := generator.PathMap{
 		Source:              fullGoSourcePath,
@@ -193,7 +194,10 @@ func watchGo(codeList *generator.CodeList) {
 
 func createDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		os.Mkdir(dir, os.ModePerm)
+		e := os.MkdirAll(dir, os.ModePerm)
+		if e != nil {
+			log.Errorf("error while creating dir for path '%s': %v", dir, e)
+		}
 	}
 }
 

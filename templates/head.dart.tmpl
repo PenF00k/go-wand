@@ -2,9 +2,12 @@
 import 'dart:typed_data';
 
 import 'package:{{ $GeneratedPackagePath }}/client.pb.dart';
+import 'package:{{ $GeneratedPackagePath }}/wrappers.pb.dart';
 import 'package:client_pik_remont/go_client/proto_call.dart';
 import 'package:flutter/material.dart' as MaterialDartLib;
 import 'package:flutter/services.dart';
+import 'package:protobuf/protobuf.dart';
+import 'package:uuid/uuid.dart';
 
 const platform = const MethodChannel("ru.pikremont.clientpikremont.CHANNEL");
 
@@ -20,4 +23,126 @@ Future<dynamic> handleMethod(MethodCall call) async {
 			apiCaller.onEvent(fullSubscriptionName, payload);
 			break;
 	}
+}
+
+typedef SubscriptionCallback<T extends GeneratedMessage> = void Function(T);
+typedef SubscriptionBytesCallback = void Function(Uint8List);
+
+abstract class ApiCaller {
+  Future<Uint8List> callMethod(String name, GeneratedMessage args);
+
+  Future<SubscriptionData> subscribe<T>(
+      String name, GeneratedMessage args, SubscriptionBytesCallback callback);
+
+  Future<bool> unsubscribe(SubscriptionData subscriptionData);
+
+  void onEvent(String fullSubscriptionName, Uint8List payload);
+}
+
+class SubscriptionData {
+  final String fullSubscriptionName;
+  final String id;
+
+  SubscriptionData(this.fullSubscriptionName, this.id);
+}
+
+
+class GoApiCaller extends ApiCaller {
+  final ApiCaller apiCaller;
+
+  GoApiCaller(this.apiCaller);
+
+  @override
+  Future<Uint8List> callMethod(String name, GeneratedMessage args) {
+    return apiCaller.callMethod(name, args);
+  }
+
+  @override
+  Future<SubscriptionData> subscribe<T>(
+      String name, GeneratedMessage args, SubscriptionBytesCallback callback) {
+    return apiCaller.subscribe(name, args, callback);
+  }
+
+  @override
+  Future<bool> unsubscribe(SubscriptionData subscriptionData) {
+    return apiCaller.unsubscribe(subscriptionData);
+  }
+
+  void onEvent(String fullSubscriptionName, Uint8List payload) {
+    return apiCaller.onEvent(fullSubscriptionName, payload);
+  }
+}
+
+class ProdGoApiCaller extends ApiCaller {
+  final idGenerator = Uuid();
+  final globalSubscriptions =
+      Map<String, Map<String, SubscriptionBytesCallback>>();
+
+  @override
+  Future<Uint8List> callMethod(String name, GeneratedMessage args) async {
+    var mapped = {
+      "methodName": name,
+      "args": args.writeToBuffer(),
+    };
+
+    return await platform.invokeMethod("callMethod", mapped) as Uint8List;
+  }
+
+  @override
+  Future<SubscriptionData> subscribe<T>(String name, GeneratedMessage args,
+      SubscriptionBytesCallback callback) async {
+
+    var mapped = {
+      "subscriptionName": name,
+      "args": args.writeToBuffer(),
+    };
+
+    final bytes = await platform.invokeMethod("subscribe", mapped);
+    final fullSubscriptionName = StringValue.fromBuffer(bytes).value;
+
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      subs = Map<String, SubscriptionBytesCallback>();
+      globalSubscriptions[fullSubscriptionName] = subs;
+    }
+
+    final uniqueId = idGenerator.v4();
+
+    subs[uniqueId] = callback;
+
+    return SubscriptionData(fullSubscriptionName, uniqueId);
+  }
+
+  @override
+  Future<bool> unsubscribe(SubscriptionData subscriptionData) async {
+    final fullSubscriptionName = subscriptionData.fullSubscriptionName;
+
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      return true;
+    }
+
+    subs.remove(subscriptionData.id);
+
+    globalSubscriptions.remove(fullSubscriptionName);
+    var mapped = {
+      "fullSubscriptionName": fullSubscriptionName,
+    };
+
+    await platform.invokeMethod("unsubscribe", mapped);
+    return true;
+  }
+
+  @override
+  void onEvent(String fullSubscriptionName, Uint8List payload) {
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      return;
+    }
+
+    subs.forEach((id, sub) {
+      final callback = subs[id];
+      if (callback != null) callback(payload);
+    });
+  }
 }

@@ -9,10 +9,11 @@ class With{{ $WithFuncName }} extends MaterialDartLib.StatefulWidget {
   {{ GetDartClassFieldForArg $item }}
   {{- end }}
 
-  const With{{ $WithFuncName }}({MaterialDartLib.Key key, this.builder{{ range $item := .Function.Args }}{{ GetDartClassConstructorPartForArg $item }}{{ end -}} })
-      : {{- range $item := .Function.Args -}}
+  With{{ $WithFuncName }}({MaterialDartLib.Key key, this.builder{{ range $item := .Function.Args }}{{ GetDartClassConstructorPartForArg $item }}{{ end -}} })
+      : {{/*{{- range $item := .Function.Args -}}
         {{ GetDartClassAssertForArg $item }}
-        {{- end }}
+        {{- end }}*/}}
+        {{/*{{- if true }}{{ end -}}*/}}
         super(key: key);
 
   @override
@@ -26,7 +27,7 @@ class With{{ $WithFuncName }} extends MaterialDartLib.StatefulWidget {
 }
 
 class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFuncName }}> {
-  String _subscriptionId;
+  SubscriptionData _subscriptionData;
   {{ $ReturnTypeName }} data;
 
   void setData({{ $ReturnTypeName }} data) {
@@ -39,7 +40,11 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
   void initState() {
     super.initState();
 
-    apiCaller.{{ .GetCallFunctionNameForSubscription }}({{ .GetCallFunctionArgsForSubscription false }}).then((data) {
+    subscribe();
+  }
+
+  void subscribe() {
+    {{ .GetCallFunctionNameForSubscription }}({{ .GetCallFunctionArgsForSubscription false }}).then((data) {
       setData(data);
     });
 
@@ -47,20 +52,32 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
       setData(result);
     };
 
-    apiCaller.{{ $FuncNameLower }}({{ .GetCallFunctionArgsForSubscription true }}).then((id) {
-      _subscriptionId = id;
+    {{ $FuncNameLower }}({{ .GetCallFunctionArgsForSubscription true }}).then((id) {
+      _subscriptionData = id;
     });
   }
 
   @override
   void dispose() {
-    apiCaller.unsubscribe(_subscriptionId);
+    unsubscribe();
     super.dispose();
   }
 
   void unsubscribe() {
     apiCaller.unsubscribe(_subscriptionId);
   }
+
+  {{- if .IfFunctionHasArgs }}
+  @override
+  void didUpdateWidget(With{{ $WithFuncName }} oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    //widget.projectID != oldWidget.projectID
+    if ({{ .CompareOldAndNewArgs }}) {
+      unsubscribe()
+      subscribe();
+    }
+  }
+  {{ end -}}
 
   @override
   MaterialDartLib.Widget build(MaterialDartLib.BuildContext context) {
