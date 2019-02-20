@@ -63,7 +63,7 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
     if (_subscriptionData != null) apiCaller.unsubscribe(_subscriptionData);
   }
 
-  {{- if .IfFunctionHasArgs }}
+  {{ if .IfFunctionHasArgs -}}
   @override
   void didUpdateWidget(With{{ $WithFuncName }} oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -72,7 +72,7 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
       subscribe();
     }
   }
-  {{ end -}}
+  {{- end }}
 
   @override
   MaterialDartLib.Widget build(MaterialDartLib.BuildContext context) {

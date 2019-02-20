@@ -8,6 +8,7 @@ import (
 type CodeList struct {
 	Package       string
 	Dev           bool
+	ServerIp      string
 	Port          int16
 	SourcePackage string
 	StructData    []StructData

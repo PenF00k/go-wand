@@ -317,25 +317,42 @@ func generateDartFilesFromProto(codeList *generator.CodeList, packageName string
 func generateFilesFromProto(codeList *generator.CodeList, packageName, target, outDir string) {
 	execDir := codeList.PathMap.Proto
 
-	if target != "go" {
-		protoFilesPath := path.Join(execDir, "*.proto")
-		files, err := filepath.Glob(protoFilesPath)
-		if err != nil {
-			log.Errorf("couldn't get proto files from dir with error: %v", err)
-		} else {
-			for _, v := range files {
-				generateFileFromProto(codeList, packageName, target, outDir, v)
-			}
-		}
+	protoFilesPath := path.Join(execDir, "*.proto")
+	files, err := filepath.Glob(protoFilesPath)
+	if err != nil {
+		log.Errorf("couldn't get proto files from dir with error: %v", err)
 	} else {
-		protoSource := packageName + ".proto"
-		generateFileFromProto(codeList, packageName, target, outDir, protoSource)
+		for _, v := range files {
+			_, fileName := path.Split(v)
+			if target == "go" && shouldSkipProtoFile(v) {
+				continue
+			}
+
+			generateFileFromProto(codeList, packageName, target, outDir, v, strings.HasPrefix(fileName, "debugwebsocket"))
+		}
 	}
 }
 
-func generateFileFromProto(codeList *generator.CodeList, packageName, target, outDir, protoSource string) {
+// skip timestamp.proto and wrappers.proto because they are in gopath
+func shouldSkipProtoFile(filePath string) bool {
+	_, fileName := path.Split(filePath)
+	return strings.HasPrefix(fileName, "timestamp") ||
+		strings.HasPrefix(fileName, "wrappers") ||
+		strings.HasPrefix(fileName, "debugwebsocket")
+}
+
+func generateFileFromProto(codeList *generator.CodeList, packageName, target, outDir, protoSource string, grpc bool) {
 	execDir := codeList.PathMap.Proto
-	targetFlag := fmt.Sprintf("--%s_out=%s", target, outDir)
+	plugin := ""
+	if grpc {
+		switch target {
+		case "go":
+			plugin = "plugins=grpc:"
+		case "dart":
+			plugin = "grpc:"
+		}
+	}
+	targetFlag := fmt.Sprintf("--%s_out=%s%s", target, plugin, outDir)
 	protoPathFlag := fmt.Sprintf("--proto_path=%s", execDir)
 
 	cmd := exec.Command("protoc", protoPathFlag, protoSource, targetFlag)

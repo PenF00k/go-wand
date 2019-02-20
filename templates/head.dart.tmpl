@@ -3,15 +3,16 @@ import 'dart:typed_data';
 
 import 'package:{{ $GeneratedPackagePath }}/client.pb.dart';
 import 'package:{{ $GeneratedPackagePath }}/wrappers.pb.dart';
-import 'package:client_pik_remont/go_client/proto_call.dart';
 import 'package:flutter/material.dart' as MaterialDartLib;
 import 'package:flutter/services.dart';
+import 'package:client_pik_remont/go_client/proto/generated/debugwebsocket.pbgrpc.dart';
+import 'package:grpc/grpc.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:uuid/uuid.dart';
 
 const platform = const MethodChannel("ru.pikremont.clientpikremont.CHANNEL");
 
-GoApiCaller apiCaller = GoApiCaller(ProdGoApiCaller());
+GoApiCaller apiCaller = GoApiCaller({{ if .CodeList.Dev }}DebugGoApiCaller(){{ else }}ProdGoApiCaller(){{ end }});
 
 Future<dynamic> handleMethod(MethodCall call) async {
 	switch (call.method) {
@@ -45,7 +46,6 @@ class SubscriptionData {
 
   SubscriptionData(this.fullSubscriptionName, this.id);
 }
-
 
 class GoApiCaller extends ApiCaller {
   final ApiCaller apiCaller;
@@ -124,12 +124,98 @@ class ProdGoApiCaller extends ApiCaller {
 
     subs.remove(subscriptionData.id);
 
-    globalSubscriptions.remove(fullSubscriptionName);
+    if (subs.length == 0) globalSubscriptions.remove(fullSubscriptionName);
     var mapped = {
       "fullSubscriptionName": fullSubscriptionName,
     };
 
     await platform.invokeMethod("unsubscribe", mapped);
+    return true;
+  }
+
+  @override
+  void onEvent(String fullSubscriptionName, Uint8List payload) {
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      return;
+    }
+
+    subs.forEach((id, sub) {
+      final callback = subs[id];
+      if (callback != null) callback(payload);
+    });
+  }
+}
+
+class DebugGoApiCaller extends ApiCaller {
+  final idGenerator = Uuid();
+  final globalSubscriptions =
+      Map<String, Map<String, SubscriptionBytesCallback>>();
+
+  ClientChannel channel;
+  DebugClient client;
+
+  DebugGoApiCaller() {
+    channel = ClientChannel('{{ .CodeList.ServerIp }}',
+        port: {{ .CodeList.Port }},
+        options: const ChannelOptions(
+            credentials: const ChannelCredentials.insecure()));
+    client = DebugClient(channel,
+        options: CallOptions(timeout: new Duration(seconds: 30)));
+
+    final eventStream = client.registerEventCallback(Empty());
+    eventStream.listen((event) {
+      onEvent(event.fullSubscriptionName, event.data);
+    });
+  }
+
+  @override
+  Future<Uint8List> callMethod(String name, GeneratedMessage args) async {
+    final data = CallMethodArgs()
+      ..methodName = name
+      ..args = args.writeToBuffer();
+
+    final result = await client.callMethod(data);
+    return Uint8List.fromList(result.value);
+  }
+
+  @override
+  Future<SubscriptionData> subscribe<T>(String name, GeneratedMessage args,
+      SubscriptionBytesCallback callback) async {
+    final data = SubscribeArgs()
+      ..subscriptionName = name
+      ..args = args.writeToBuffer();
+
+    final unsubscribeArgs = await client.subscribe(data);
+    final fullSubscriptionName = unsubscribeArgs.fullSubscriptionName;
+
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      subs = Map<String, SubscriptionBytesCallback>();
+      globalSubscriptions[fullSubscriptionName] = subs;
+    }
+
+    final uniqueId = idGenerator.v4();
+
+    subs[uniqueId] = callback;
+
+    return SubscriptionData(fullSubscriptionName, uniqueId);
+  }
+
+  @override
+  Future<bool> unsubscribe(SubscriptionData subscriptionData) async {
+    final fullSubscriptionName = subscriptionData.fullSubscriptionName;
+
+    var subs = globalSubscriptions[fullSubscriptionName];
+    if (subs == null) {
+      return true;
+    }
+
+    subs.remove(subscriptionData.id);
+    if (subs.length == 0) globalSubscriptions.remove(fullSubscriptionName);
+
+    final args = UnsubscribeArgs()..fullSubscriptionName = fullSubscriptionName;
+    await client.unsubscribe(args);
     return true;
   }
 

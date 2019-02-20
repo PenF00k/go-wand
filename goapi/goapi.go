@@ -131,7 +131,7 @@ func (event EventCall) OnEvent(fullSubscriptionName string, data []byte) {
 		log.Printf("sending event %s", fullSubscriptionName)
 		event.callback.OnEvent(fullSubscriptionName, data)
 	} else {
-		log.Printf("skipping event, no active callbback")
+		log.Printf("skipping event, no active callback")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/iancoleman/strcase"
 	"gitlab.vmassive.ru/wand/generator/formatter"
 	"go/ast"
+	"strings"
 )
 
 type TypeName string
@@ -335,6 +336,16 @@ type Function struct {
 
 func (f Function) GetLowerCaseName() string {
 	return strcase.ToLowerCamel(f.FunctionName)
+}
+
+func (f Function) GetSubscribeFunctionBaseName() (string, error) {
+	fn := f.FunctionName
+	if !f.IsSubscription {
+		return "", fmt.Errorf("function %s is not a subscription", fn)
+	}
+
+	trimmed := strings.TrimPrefix(fn, "Subscribe")
+	return trimmed, nil
 }
 
 type Primitive struct {

@@ -11,9 +11,10 @@ Future<SubscriptionData> {{ $FuncNameLower }}({{ .GetSubscriptionArgsAsDartTypes
         final args = {{ $FuncName }}Args(){{ .BindArgs }};
 
         return apiCaller.subscribe("{{ $FuncName }}", args, callback);
-    } on PlatformException catch (e) {
-        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $e");
-        rethrow;
+    } catch (e) {
+        final es = Uri.decodeFull(e.toString());
+        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $es");
+        throw(es);
     }
 }
 {{ else if .Function.IsPure }}
@@ -23,9 +24,10 @@ Future<{{ $ReturnTypeName }}> {{ $FuncNameLower }}({{ .GetArgsAsDartTypes }}) as
         final args = {{ $FuncName }}Args(){{ .BindArgs }};
         final Uint8List bytes = await apiCaller.callMethod("{{ $FuncName }}", args);
         return {{ $ReturnTypeName }}.fromBuffer(bytes);
-    } on PlatformException catch (e) {
-        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $e");
-        rethrow;
+    } catch (e) {
+        final es = Uri.decodeFull(e.toString());
+        MaterialDartLib.debugPrint("Call of {{ $FuncNameLower }} failed with error: $es");
+        throw(es);
     }
 }
 {{ end }}

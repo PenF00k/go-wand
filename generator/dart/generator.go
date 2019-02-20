@@ -169,9 +169,34 @@ func (gen CodeGenerator) writeWithHeader(f io.Writer) {
 }
 
 func (gen CodeGenerator) writeWithFunctions(wr io.Writer) {
-	for _, function := range gen.Adapter.Functions {
-		gen.writeWithFunction(wr, gen.Package, function, gen.CodeList.PackageMap.ProtoPackageName)
+	funcs := gen.Adapter.Functions
+	for _, fn := range funcs {
+		if !fn.IsSubscription || !hasGetMethod(funcs, fn) {
+			continue
+		}
+
+		gen.writeWithFunction(wr, gen.Package, fn, gen.CodeList.PackageMap.ProtoPackageName)
 	}
+}
+
+func hasGetMethod(funcs []adapter.Function, fn adapter.Function) bool {
+	has := false
+
+	baseName, err := fn.GetSubscribeFunctionBaseName()
+	if err != nil {
+		log.Errorf("couldn't get function base name", err)
+		return false
+	}
+
+	getFunctionName := "Get" + baseName
+
+	for _, v := range funcs {
+		if getFunctionName == v.FunctionName {
+			has = true
+		}
+	}
+
+	return has
 }
 
 func (gen CodeGenerator) writeWithFunction(wr io.Writer, pack string, function adapter.Function, protoPackageName string) {

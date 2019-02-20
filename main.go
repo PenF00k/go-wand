@@ -86,8 +86,10 @@ func runApplication(configName string, dev bool) {
 	createDirectory(targetGoCallPath)
 	createDirectory(configuration.Js.Path)
 
-	protoPath := path.Join(targetGoCallPath, "proto")
-	protoRelPath := path.Join(configuration.Wrapper.Package, "proto")
+	protoPackageName := "proto_client"
+
+	protoPath := path.Join(targetGoCallPath, protoPackageName)
+	protoRelPath := path.Join(configuration.Wrapper.Package, protoPackageName)
 	createDirectory(protoPath)
 
 	workingDir, err := os.Getwd()
@@ -110,7 +112,7 @@ func runApplication(configName string, dev bool) {
 	}
 
 	packageMap := generator.PackageMap{
-		ProtoPackageName:  "proto_client",
+		ProtoPackageName:  protoPackageName,
 		FlutterAppPackage: configuration.Flutter.AppPackage,
 	}
 
@@ -122,6 +124,7 @@ func runApplication(configName string, dev bool) {
 	codeList := &generator.CodeList{
 		Package:       goPackageName,
 		Dev:           dev,
+		ServerIp:      getIP(),
 		Port:          configuration.Wrapper.Port,
 		SourcePackage: configuration.Source.Package,
 		Config:        configuration,
@@ -213,4 +216,13 @@ func shutdown(runner *reload.LiveReload) {
 		}
 		os.Exit(1)
 	}()
+}
+
+func getIP() string {
+	ip, err := util.GetOutboundIP()
+	if err != nil {
+		log.Errorf("couldn't get server ip address: %v", err)
+	}
+
+	return ip
 }

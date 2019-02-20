@@ -126,14 +126,14 @@ func (t TemplateStructData) GetCallFunctionArgsForSubscription(withCallback bool
 }
 
 func (t TemplateStructData) GetWithFunctionName() string {
-	fn := t.Function.FunctionName
-	if !t.Function.IsSubscription {
+	baseName, err := t.Function.GetSubscribeFunctionBaseName()
+	if err != nil {
+		fn := t.Function.FunctionName
 		log.Warnf("method GetCallFunctionName must be called for subscription funcs only. Called on %s", fn)
-		return t.Function.FunctionName
+		return fn
 	}
 
-	trimmed := strings.TrimPrefix(fn, "Subscribe")
-	return trimmed
+	return baseName
 }
 
 func (t TemplateStructData) BindArgs() string {

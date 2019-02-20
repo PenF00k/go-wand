@@ -12,11 +12,8 @@ import (
 	"strconv"
 	"time"
 	{{if .CodeList.Dev -}}
-		"net/http"
-		"fmt"
-		"log"
 		"gitlab.vmassive.ru/wand/goapi/remgo"
-		"os"{{end}}
+	{{- end}}
 )
 
 type FuncCallback interface {
@@ -84,57 +81,19 @@ func Ping____XXX(val interface{}) string {
 	return data.Val
 }
 
-{{if .CodeList.Dev }}
-func serveHome(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	http.ServeFile(w, r, "home.html")
-}
-
-
-func SetCors(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-
-		if (*r).Method == "OPTIONS" {
-			return
-		}
-
-		h.ServeHTTP(w, r)
-	})
-}
-
+{{- if .CodeList.Dev }}
 func main() {
+	InitializeEx(
+		"en",
+		"./data",
+		"https://retro.vmassive.ru/graphql",
+		"wss://retro.vmassive.ru/subscriptions",
+		true)
 	hub := remgo.NewHub()
-	go hub.Run(&registry)
-
-  goPath := os.Getenv("GOPATH")
-	fs := http.FileServer(http.Dir(goPath  + "/src/"))
-	handler := http.StripPrefix("/file" + goPath + "/src/", fs)
-
-	fmt.Printf("serving files in %s\n", goPath)
-
-	http.Handle("/file/", SetCors(handler))
-
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		remgo.ServeWs(&registry, hub, w, r)
-	})
-	err := http.ListenAndServe("0.0.0.0:9009", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+	remgo.ServeWs(&registry, hub, {{ .CodeList.Port }})
 }
-{{end}}
+{{ end -}}
+
 // CallMethod - call from client
 func CallMethod(methodName string, args []byte, callback FuncCallback) {
 	wrapper := newFuncCallbackWrapper(callback)
