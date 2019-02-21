@@ -1,4 +1,6 @@
 {{- $GeneratedPackagePath := .GetDartGeneratedPath -}}
+import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:{{ $GeneratedPackagePath }}/client.pb.dart';
@@ -147,26 +149,70 @@ class ProdGoApiCaller extends ApiCaller {
   }
 }
 
+class SubscribeData {
+  final SubscribeArgs args;
+  final SubscriptionBytesCallback callback;
+
+  SubscribeData(this.args, this.callback);
+}
+
 class DebugGoApiCaller extends ApiCaller {
+  final reconnectTimeout = Duration(seconds: 1);
   final idGenerator = Uuid();
   final globalSubscriptions =
       Map<String, Map<String, SubscriptionBytesCallback>>();
+  final pendingCalls = Queue<CallMethodArgs>();
+  final pendingSubs = Queue<SubscribeData>();
 
   ClientChannel channel;
   DebugClient client;
 
   DebugGoApiCaller() {
-    channel = ClientChannel('{{ .CodeList.ServerIp }}',
-        port: {{ .CodeList.Port }},
+    _connect();
+  }
+
+  void _connect() {
+    channel = ClientChannel('192.168.88.19',
+        port: 9009,
         options: const ChannelOptions(
             credentials: const ChannelCredentials.insecure()));
     client = DebugClient(channel,
-        options: CallOptions(timeout: new Duration(seconds: 30)));
+        options: CallOptions(timeout: new Duration(seconds: 10)));
+
+
 
     final eventStream = client.registerEventCallback(Empty());
     eventStream.listen((event) {
-      onEvent(event.fullSubscriptionName, event.data);
+      try {
+        onEvent(event.fullSubscriptionName, Uint8List.fromList(event.data));
+      } catch(e) {
+        MaterialDartLib.debugPrint("error sending event: $e");
+      }
+    }, onError: (e) {
+      MaterialDartLib.debugPrint(
+          "error on event stream: $e; Restarting in $reconnectTimeout...");
+      Timer(reconnectTimeout, () {
+        _connect();
+      });
     });
+
+    _sendPending();
+
+  }
+
+  void _sendPending() {
+    while (pendingCalls.isNotEmpty) {
+      final callData = pendingCalls.first;
+      _callMethod(callData);
+
+      pendingCalls.removeFirst();
+    }
+    while (pendingSubs.isNotEmpty) {
+      final subData = pendingSubs.first;
+      _subscribe(subData.args, subData.callback);
+
+      pendingSubs.removeFirst();
+    }
   }
 
   @override
@@ -175,8 +221,20 @@ class DebugGoApiCaller extends ApiCaller {
       ..methodName = name
       ..args = args.writeToBuffer();
 
-    final result = await client.callMethod(data);
-    return Uint8List.fromList(result.value);
+    return _callMethod(data);
+  }
+
+  Future<Uint8List> _callMethod(CallMethodArgs data) async {
+    try {
+      final result = await client.callMethod(data);
+      return Uint8List.fromList(result.value);
+    } on GrpcError catch (e) {
+      if (e.code != StatusCode.unknown) {
+        pendingCalls.add(data);
+      }
+      pendingCalls.add(data);
+      rethrow;
+    }
   }
 
   @override
@@ -186,20 +244,33 @@ class DebugGoApiCaller extends ApiCaller {
       ..subscriptionName = name
       ..args = args.writeToBuffer();
 
-    final unsubscribeArgs = await client.subscribe(data);
-    final fullSubscriptionName = unsubscribeArgs.fullSubscriptionName;
+    return _subscribe(data, callback);
+  }
 
-    var subs = globalSubscriptions[fullSubscriptionName];
-    if (subs == null) {
-      subs = Map<String, SubscriptionBytesCallback>();
-      globalSubscriptions[fullSubscriptionName] = subs;
+  Future<SubscriptionData> _subscribe<T>(
+      SubscribeArgs data, SubscriptionBytesCallback callback) async {
+    try {
+      final unsubscribeArgs = await client.subscribe(data);
+      final fullSubscriptionName = unsubscribeArgs.fullSubscriptionName;
+
+      var subs = globalSubscriptions[fullSubscriptionName];
+      if (subs == null) {
+        subs = Map<String, SubscriptionBytesCallback>();
+        globalSubscriptions[fullSubscriptionName] = subs;
+      }
+
+      final uniqueId = idGenerator.v4();
+
+      subs[uniqueId] = callback;
+
+      return SubscriptionData(fullSubscriptionName, uniqueId);
+    } on GrpcError catch (e) {
+      if (e.code != StatusCode.unknown) {
+        final subData = SubscribeData(data, callback);
+        pendingSubs.add(subData);
+      }
+      rethrow;
     }
-
-    final uniqueId = idGenerator.v4();
-
-    subs[uniqueId] = callback;
-
-    return SubscriptionData(fullSubscriptionName, uniqueId);
   }
 
   @override
