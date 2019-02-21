@@ -33,9 +33,11 @@ func ServeWs(registry *goapi.Registry, hub *Hub, port int) {
 	}
 
 	keepAliveOption := grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionIdle: 5 * time.Minute,           // <--- This fixes it!
+		MaxConnectionIdle: 5 * time.Minute, // <--- This fixes it!
 	})
-	grpcServer := grpc.NewServer(keepAliveOption)
+	log.Tracef("%+v", keepAliveOption)
+
+	grpcServer := grpc.NewServer()
 	service := newServer(registry)
 
 	debugwebsocket.RegisterDebugServer(grpcServer, service)
@@ -93,8 +95,7 @@ func (clb *CallbackWrapper) toSync() (*debugwebsocket.Payload, error) {
 	}
 }
 
-var eventer debugwebsocket.Debug_RegisterEventCallbackServer
-var eventChan = make(chan *debugwebsocket.SubscriptionEvent)
+var eventChannels = make(map[chan *debugwebsocket.SubscriptionEvent]bool)
 
 func (d *debugServer) CallMethod(ctx context.Context, args *debugwebsocket.CallMethodArgs) (*debugwebsocket.Payload, error) {
 	if args == nil {
@@ -120,11 +121,27 @@ func (d *debugServer) Unsubscribe(ctx context.Context, args *debugwebsocket.Unsu
 }
 
 func (d *debugServer) RegisterEventCallback(args *debugwebsocket.Empty, server debugwebsocket.Debug_RegisterEventCallbackServer) error {
+	eventChan := make(chan *debugwebsocket.SubscriptionEvent)
+	log.Tracef("Event channel created")
+	eventChannels[eventChan] = true
+	log.Tracef("eventChannels length = %v", len(eventChannels))
+
+	defer func() {
+		log.Tracef("Event channel closed")
+		delete(eventChannels, eventChan)
+		close(eventChan)
+		log.Tracef("eventChannels length = %v", len(eventChannels))
+	}()
+
 	for {
+		//dummy := debugwebsocket.SubscriptionEvent{}
+		//server.Send(&dummy)
+
 		select {
 		case event := <-eventChan:
 			if err := server.Send(event); err != nil {
 				log.Errorf("couldn't send event with error: %v", err)
+				return err // we done
 			}
 		}
 	}
@@ -162,7 +179,11 @@ func (h *Hub) OnEvent(fullSubscriptionName string, bytes []byte) {
 		FullSubscriptionName: fullSubscriptionName,
 		Data:                 bytes,
 	}
-	eventChan <- event
+
+	for e := range eventChannels {
+		log.Printf("[EVENT] sending to channel %+v", e)
+		e <- event
+	}
 }
 
 func NewHub() *Hub {
