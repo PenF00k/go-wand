@@ -54,6 +54,7 @@ func Parse(codeList *generator.CodeList) {
 
 		generateGoFilesFromProto(codeList, packageName)
 		generateDartFilesFromProto(codeList, packageName)
+		generateJavaFilesFromProto(codeList, packageName)
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName, ad, codeList)
 		if err := goGen.CreateCode(); err != nil {
@@ -314,6 +315,10 @@ func generateDartFilesFromProto(codeList *generator.CodeList, packageName string
 	generateFilesFromProto(codeList, packageName, "dart", codeList.PathMap.FlutterGenerated)
 }
 
+func generateJavaFilesFromProto(codeList *generator.CodeList, packageName string) {
+	generateFilesFromProto(codeList, packageName, "java", codeList.PathMap.JavaGenerated)
+}
+
 func generateFilesFromProto(codeList *generator.CodeList, packageName, target, outDir string) {
 	execDir := codeList.PathMap.Proto
 
@@ -324,20 +329,24 @@ func generateFilesFromProto(codeList *generator.CodeList, packageName, target, o
 	} else {
 		for _, v := range files {
 			_, fileName := path.Split(v)
-			if target == "go" && shouldSkipProtoFile(v) {
+			if shouldSkipProtoFile(target, v) {
 				continue
 			}
 
+			//if target == "java" {
+			//	generateJavaFileFromProto(codeList, packageName, v)
+			//} else {
+			//	generateFileFromProto(codeList, packageName, target, outDir, v, strings.HasPrefix(fileName, "debugwebsocket"))
+			//}
 			generateFileFromProto(codeList, packageName, target, outDir, v, strings.HasPrefix(fileName, "debugwebsocket"))
 		}
 	}
 }
 
 // skip timestamp.proto and wrappers.proto because they are in gopath
-func shouldSkipProtoFile(filePath string) bool {
+func shouldSkipProtoFile(target, filePath string) bool {
 	_, fileName := path.Split(filePath)
-	return strings.HasPrefix(fileName, "timestamp") ||
-		strings.HasPrefix(fileName, "wrappers") ||
+	return (target == "go" && (strings.HasPrefix(fileName, "timestamp") || strings.HasPrefix(fileName, "wrappers"))) ||
 		strings.HasPrefix(fileName, "debugwebsocket")
 }
 
@@ -359,7 +368,26 @@ func generateFileFromProto(codeList *generator.CodeList, packageName, target, ou
 	cmd.Dir = execDir
 
 	log.Infof("executing protoc in dir '%v', packageName = '%v', target = '%v', outDir = '%v', protoPathFlag = '%v' \n protoSource = '%v'", cmd.Dir, packageName, target, outDir, protoPathFlag, protoSource)
+	runCommand(cmd)
+}
 
+//protoc -I=$SRC_DIR --java_out=$DST_DIR $SRC_DIR/addressbook.proto
+//protoc --plugin=protoc-gen-grpc-java --grpc-java_out="$OUTPUT_FILE" --proto_path="$DIR_OF_PROTO_FILE" "$PROTO_FILE"
+func generateJavaFileFromProto(codeList *generator.CodeList, packageName, protoSource string) {
+	execDir := codeList.PathMap.Proto
+
+	outDir := codeList.PathMap.JavaGenerated
+	targetFlag := fmt.Sprintf("--grpc-java_out=%s", outDir)
+	protoPathFlag := fmt.Sprintf("--proto_path=%s", execDir)
+
+	cmd := exec.Command("protoc", "--plugin=protoc-gen-grpc-java", targetFlag, protoSource)
+	cmd.Dir = execDir
+
+	log.Infof("executing protoc in dir '%v', packageName = '%v', target = '%v', outDir = '%v', protoPathFlag = '%v' \n protoSource = '%v'", cmd.Dir, packageName, "java", outDir, protoPathFlag, protoSource)
+	runCommand(cmd)
+}
+
+func runCommand(cmd *exec.Cmd) {
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -368,6 +396,5 @@ func generateFileFromProto(codeList *generator.CodeList, packageName, target, ou
 	err := cmd.Run()
 	if err != nil {
 		log.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return
 	}
 }

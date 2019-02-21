@@ -47,6 +47,7 @@ type PathMap struct {
 	FlutterGenerated    string
 	FlutterGeneratedRel string
 	Proto               string
+	JavaGenerated       string
 	ProtoRel            string
 }
 

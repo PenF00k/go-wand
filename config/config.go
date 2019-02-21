@@ -28,6 +28,10 @@ type Flutter struct {
 	AppPackage         string `yaml:"app_package"`
 }
 
+type Java struct {
+	GeneratedProtoPath string `yaml:"generated_proto_path"`
+}
+
 type Wrapper struct {
 	Package string
 	Port    int16
@@ -39,6 +43,7 @@ type Configuration struct {
 	Js      Js
 	Proto   Proto
 	Flutter Flutter
+	Java    Java
 }
 
 func requestString(name string) string {

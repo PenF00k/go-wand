@@ -101,6 +101,10 @@ func runApplication(configName string, dev bool) {
 	flutterGeneratedPath := path.Join(workingDir, flutterGeneratedPathRelative)
 	createDirectory(flutterGeneratedPath)
 
+	javaGeneratedPathRelative := configuration.Java.GeneratedProtoPath
+	javaGeneratedPath := path.Join(workingDir, javaGeneratedPathRelative)
+	createDirectory(javaGeneratedPath)
+
 	pathMap := generator.PathMap{
 		Source:              fullGoSourcePath,
 		Target:              targetGoCallPath,
@@ -108,6 +112,7 @@ func runApplication(configName string, dev bool) {
 		FlutterGenerated:    flutterGeneratedPath,
 		FlutterGeneratedRel: flutterGeneratedPathRelative,
 		Proto:               protoPath,
+		JavaGenerated:       javaGeneratedPath,
 		ProtoRel:            protoRelPath,
 	}
 
