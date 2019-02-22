@@ -54,7 +54,7 @@ func Parse(codeList *generator.CodeList) {
 
 		generateGoFilesFromProto(codeList, packageName)
 		generateDartFilesFromProto(codeList, packageName)
-		generateJavaFilesFromProto(codeList, packageName)
+		//generateJavaFilesFromProto(codeList, packageName)
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName, ad, codeList)
 		if err := goGen.CreateCode(); err != nil {

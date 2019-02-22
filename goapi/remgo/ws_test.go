@@ -177,3 +177,43 @@ func login(t *testing.T, client debugwebsocket.DebugClient, ctx context.Context)
 
 	logrus.Printf("result: %+v", device)
 }
+
+func TestIstokenValid(t *testing.T) {
+	//t.Skip("Only for debug")
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	conn, err := grpc.Dial("192.168.88.19:9009", opts...)
+	if err != nil {
+		t.Fatalf("error on Dial: %v", err)
+	}
+	defer conn.Close()
+
+	client := debugwebsocket.NewDebugClient(conn)
+
+	ctx := context.Background()
+
+	args := proto_client.IsTokenValidArgs{}
+
+	bytes, err := proto.Marshal(&args)
+	if err != nil {
+		t.Fatalf("error on Marshal: %v", err)
+	}
+
+	argsObj := debugwebsocket.CallMethodArgs{
+		MethodName: "IsTokenValid",
+		Args:       bytes,
+	}
+
+	payload, err := client.CallMethod(ctx, &argsObj)
+	if err != nil {
+		t.Fatalf("error on CallMethod: %v", err)
+	}
+
+	res := &wrappers.BoolValue{}
+	err = proto.Unmarshal(payload.Value, res)
+	if err != nil {
+		t.Fatalf("error on Unmarshal: %v", err)
+	}
+
+	logrus.Printf("result: %+v", res)
+
+}
