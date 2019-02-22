@@ -23,6 +23,7 @@ Future<{{ $ReturnTypeName }}> {{ $FuncNameLower }}({{ .GetArgsAsDartTypes }}) as
     try {
         final args = {{ $FuncName }}Args(){{ .BindArgs }};
         final Uint8List bytes = await apiCaller.callMethod("{{ $FuncName }}", args);
+        if (bytes == null) return null;
         return {{ $ReturnTypeName }}.fromBuffer(bytes);
     } catch (e) {
         final es = Uri.decodeFull(e.toString());
