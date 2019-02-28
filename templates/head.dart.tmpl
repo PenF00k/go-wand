@@ -172,8 +172,8 @@ class DebugGoApiCaller extends ApiCaller {
   }
 
   void _connect() {
-    channel = ClientChannel('192.168.88.19',
-        port: 9009,
+    channel = ClientChannel('{{ .CodeList.ServerIp }}',
+        port: {{ .CodeList.Port }},
         options: const ChannelOptions(
             credentials: const ChannelCredentials.insecure()));
     client = DebugClient(channel,
