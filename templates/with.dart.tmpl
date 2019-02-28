@@ -27,9 +27,10 @@ class _With{{ $WithFuncName }}State extends MaterialDartLib.State<With{{ $WithFu
   {{ $ReturnTypeName }} data;
 
   void setData({{ $ReturnTypeName }} data) {
-    setState(() {
-      this.data = data;
-    });
+    if (mounted)
+      setState(() {
+        this.data = data;
+      });
   }
 
   @override
