@@ -395,6 +395,6 @@ func runCommand(cmd *exec.Cmd) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Println(fmt.Sprint(err) + ": " + stderr.String())
+		log.Errorln(fmt.Sprint(err) + ": " + stderr.String())
 	}
 }
