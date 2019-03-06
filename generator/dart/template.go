@@ -141,7 +141,13 @@ func (t TemplateStructData) BindArgs() string {
 	args := t.Function.Args
 	res := ""
 	for _, v := range args {
-		bound := fmt.Sprintf("..%s = %[1]s", v.Name)
+		var bound string
+		if v.Type.Slice != nil {
+			//..statuses.addAll(statuses)
+			bound = fmt.Sprintf("..%s.addAll(%[1]s)", v.Name)
+		} else {
+			bound = fmt.Sprintf("..%s = %[1]s", v.Name)
+		}
 		res = res + bound
 	}
 
