@@ -10,6 +10,7 @@ import (
 	"net"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/satori/go.uuid"
@@ -70,6 +71,12 @@ func newCallbackWrapper() *CallbackWrapper {
 	}
 }
 
+type eventReceiver struct {
+	channel chan *debugwebsocket.SubscriptionEvent
+	rwLock  sync.RWMutex
+	isAlive bool
+}
+
 func (clb *CallbackWrapper) OnSuccess(bytes []byte) {
 	log.Printf("method call success")
 	clb.gavno <- bytes
@@ -95,7 +102,7 @@ func (clb *CallbackWrapper) toSync() (*debugwebsocket.Payload, error) {
 	}
 }
 
-var eventChannels = make(map[chan *debugwebsocket.SubscriptionEvent]bool)
+var eventReceivers = make(map[*eventReceiver]bool)
 
 func (d *debugServer) CallMethod(ctx context.Context, args *debugwebsocket.CallMethodArgs) (*debugwebsocket.Payload, error) {
 	if args == nil {
@@ -121,16 +128,22 @@ func (d *debugServer) Unsubscribe(ctx context.Context, args *debugwebsocket.Unsu
 }
 
 func (d *debugServer) RegisterEventCallback(args *debugwebsocket.Empty, server debugwebsocket.Debug_RegisterEventCallbackServer) error {
-	eventChan := make(chan *debugwebsocket.SubscriptionEvent)
-	log.Tracef("Event channel created")
-	eventChannels[eventChan] = true
-	log.Tracef("eventChannels length = %v", len(eventChannels))
+	receiver := &eventReceiver{
+		channel: make(chan *debugwebsocket.SubscriptionEvent),
+		isAlive: true,
+	}
+	log.Tracef("Event receiver created")
+	eventReceivers[receiver] = true
+	log.Tracef("eventReceivers length = %v", len(eventReceivers))
 
 	defer func() {
-		log.Tracef("Event channel closed")
-		delete(eventChannels, eventChan)
-		close(eventChan)
-		log.Tracef("eventChannels length = %v", len(eventChannels))
+		receiver.rwLock.Lock()
+		receiver.isAlive = false
+		delete(eventReceivers, receiver)
+		close(receiver.channel)
+		log.Tracef("Event receiver closed: %+v", receiver)
+		log.Tracef("eventReceivers = %+v", eventReceivers)
+		receiver.rwLock.Unlock()
 	}()
 
 	for {
@@ -138,7 +151,7 @@ func (d *debugServer) RegisterEventCallback(args *debugwebsocket.Empty, server d
 		//server.Send(&dummy)
 
 		select {
-		case event := <-eventChan:
+		case event := <-receiver.channel:
 			if err := server.Send(event); err != nil {
 				log.Errorf("couldn't send event with error: %v", err)
 				return err // we done
@@ -180,9 +193,13 @@ func (h *Hub) OnEvent(fullSubscriptionName string, bytes []byte) {
 		Data:                 bytes,
 	}
 
-	for e := range eventChannels {
-		log.Printf("[EVENT] sending to channel %+v", e)
-		e <- event
+	for er := range eventReceivers {
+		log.Printf("[EVENT] sending to channel %+v", er)
+		er.rwLock.RLock()
+		if er.isAlive {
+			er.channel <- event
+		}
+		er.rwLock.RUnlock()
 	}
 }
 
