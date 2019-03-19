@@ -20,7 +20,7 @@ import (
 )
 
 // ParseFile - Parse file
-func Parse(codeList *generator.CodeList) {
+func Parse(codeList *generator.CodeList, genDartDto bool) {
 	src := codeList.PathMap.Source
 	log.Printf("parsing files in %s", src)
 
@@ -52,18 +52,24 @@ func Parse(codeList *generator.CodeList) {
 			log.Errorf("error while generating proto code")
 		}
 
-		generateGoFilesFromProto(codeList, packageName)
 		generateDartFilesFromProto(codeList, packageName)
+
+		dartGen := dart.New(codeList.PathMap.FlutterGenerated, packageName, ad, codeList)
+		if err := dartGen.CreateCode(); err != nil {
+			log.Errorf("error while generating dart code")
+		}
+
+		if genDartDto {
+			//leave after we generated dart if needed
+			return
+		}
+
+		generateGoFilesFromProto(codeList, packageName)
 		//generateJavaFilesFromProto(codeList, packageName)
 
 		goGen := gocall.New(codeList.PathMap.Target, packageName, ad, codeList)
 		if err := goGen.CreateCode(); err != nil {
 			log.Errorf("error while generating go code")
-		}
-
-		dartGen := dart.New(codeList.PathMap.FlutterGenerated, packageName, ad, codeList)
-		if err := dartGen.CreateCode(); err != nil {
-			log.Errorf("error while generating dart code")
 		}
 	} else {
 		log.Printf("no changes, skipping")

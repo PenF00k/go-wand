@@ -44,8 +44,8 @@
 {{- define "gen_time" }}
     genTimeTime := func(data time.Time) *timestamp.Timestamp {
         return &timestamp.Timestamp{
+            Seconds: data.Unix(),
             Nanos:   int32(data.Nanosecond()),
-            Seconds: int64(data.Nanosecond()),
         }
     }
 {{ end -}}

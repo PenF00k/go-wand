@@ -96,7 +96,7 @@ func (clb *CallbackWrapper) toSync() (*debugwebsocket.Payload, error) {
 				Value: res,
 			}, nil
 		case err := <-clb.ssanina:
-			log.Errorf("CallbackWrapper OnError string ssanina: %s", err)
+			log.Errorf("CallbackWrapper On Error string ssanina: %s", err)
 			return nil, err
 		}
 	}

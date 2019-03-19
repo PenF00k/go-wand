@@ -35,12 +35,16 @@ func main() {
 			Name:  "release",
 			Usage: "contruct release",
 		},
+		cli.BoolFlag{
+			Name:  "genDartDto",
+			Usage: "generate only dart dto classes (for instance for shared library)",
+		},
 	}
 
 	app.Name = "wand"
 	app.Usage = "magic link between go and js"
 	app.Action = func(c *cli.Context) error {
-		runApplication(c.String("config"), !c.Bool("release"))
+		runApplication(c.String("config"), !c.Bool("release"), c.Bool("genDartDto"))
 		return nil
 	}
 
@@ -72,7 +76,7 @@ func getGoPath() string {
 	return gopath
 }
 
-func runApplication(configName string, dev bool) {
+func runApplication(configName string, dev bool, genDartDto bool) {
 	configuration, err := config.ReadConfig(configName)
 	if err != nil {
 		return
@@ -137,15 +141,20 @@ func runApplication(configName string, dev bool) {
 		PackageMap:    packageMap,
 	}
 
+	if genDartDto {
+		parser.Parse(codeList, genDartDto)
+		return
+	}
+
 	if dev {
 		watchGo(codeList)
 	} else {
-		parser.Parse(codeList)
+		parser.Parse(codeList, false)
 	}
 }
 
 func watchGo(codeList *generator.CodeList) {
-	parser.Parse(codeList)
+	parser.Parse(codeList, false)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -182,7 +191,7 @@ func watchGo(codeList *generator.CodeList) {
 					event.Op&fsnotify.Rename == fsnotify.Rename ||
 					event.Op&fsnotify.Create == fsnotify.Create {
 					log.Println("modified file:", event.Name)
-					parser.Parse(codeList)
+					parser.Parse(codeList, false)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
