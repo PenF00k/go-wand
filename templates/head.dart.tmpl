@@ -175,10 +175,13 @@ class DebugGoApiCaller extends ApiCaller {
     channel = ClientChannel('{{ .CodeList.ServerIp }}',
         port: {{ .CodeList.Port }},
         options: const ChannelOptions(
-            credentials: const ChannelCredentials.insecure()));
+          credentials: const ChannelCredentials.insecure(),
+          idleTimeout: Duration(days: 10),
+        ));
     client = DebugClient(channel,
-        options: CallOptions(timeout: new Duration(seconds: 10)));
-
+        options: CallOptions(
+          timeout: Duration(days: 10),
+        ));
 
 
     final eventStream = client.registerEventCallback(Empty());
