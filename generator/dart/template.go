@@ -193,6 +193,8 @@ func getDartType(goType *adapter.Type, toLower bool) string {
 		return goType.Struct.Name.ToUpperCamelCase()
 	} else if goType.Slice != nil {
 		return fmt.Sprintf("List<%s>", getDartType(goType.Slice.InnerType, toLower))
+	} else if goType.Selector != nil {
+		return format.BasicDartTypeFormatter.Format(fmt.Sprintf("%s.%s", goType.Selector.Package, goType.Selector.TypeName))
 	} else if goType.IsPrimitive {
 		//tn := goType.Name.ToUpperCamelCase()
 		//if toLower {
@@ -200,6 +202,8 @@ func getDartType(goType *adapter.Type, toLower bool) string {
 		//}
 		return format.BasicDartTypeFormatter.Format(string(goType.Name))
 	}
+
+	log.Errorf("getDartType unknownDartType: %+v", goType)
 
 	return "unknownDartType"
 }

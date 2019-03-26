@@ -150,7 +150,10 @@
 
 {{- define "gen_time_reverse" }}
     genArgTimeTime := func(data *timestamp.Timestamp) time.Time {
-        t := time.Date(0,0, 0, 0, 0, int(data.Seconds), int(data.Nanos), nil)
+        t, err := ptypes.Timestamp(data)
+        if err != nil {
+            callback.OnError(err.Error())
+        }
         return t
     }
 {{ end -}}

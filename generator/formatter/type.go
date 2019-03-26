@@ -109,8 +109,8 @@ func (f basicDartTypeFormatter) Format(TypeName string) string {
 		return "bool"
 	case "string":
 		return "String"
-		//case "time.Time":
-		//	return "google.protobuf.Timestamp"
+	case "time.Time":
+		return "Timestamp"
 	}
 
 	return TypeName
