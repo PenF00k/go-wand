@@ -42,26 +42,32 @@ type subscriptionAdapter struct {
 }
 
 type Registry struct {
-	subscriptions        map[string]*subscriptionAdapter
-	functions            map[string]CallFunc
+	//subscriptions        map[string]*subscriptionAdapter
+	//functions            map[string]CallFunc
+	subscriptions        sync.Map
+	functions            sync.Map
 	subscriptionRegistry SubscriptionRegistry
 }
 
 func NewRegistry() Registry {
 	return Registry{
-		subscriptions:        make(map[string]*subscriptionAdapter),
-		functions:            make(map[string]CallFunc),
+		//subscriptions:        make(map[string]*subscriptionAdapter),
+		//functions:            make(map[string]CallFunc),
+		subscriptions:        sync.Map{},
+		functions:            sync.Map{},
 		subscriptionRegistry: NewSubscriptionRegistry(),
 	}
 }
 
 func (registry *Registry) RegisterSubscription(subscriptionName string, subFunc SubFunc, typeFunction SubTypesFunc) {
-	registry.subscriptions[subscriptionName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
+	//registry.subscriptions[subscriptionName] = &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction}
+	registry.subscriptions.Store(subscriptionName, &subscriptionAdapter{subscriptionFunc: subFunc, subscriptionTypesFunc: typeFunction})
 }
 
 func (registry *Registry) RegisterFunction(functionName string, adapterFunction CallFunc) {
 	log.Infof("Registry RegisterFunction '%v'", functionName)
-	registry.functions[functionName] = adapterFunction
+	//registry.functions[functionName] = adapterFunction
+	registry.functions.Store(functionName, adapterFunction)
 }
 
 func (registry *Registry) RegisterEventCallback(callback Event) {
@@ -71,9 +77,15 @@ func (registry *Registry) RegisterEventCallback(callback Event) {
 
 func (registry *Registry) Subscribe(subscriptionName string, args []byte) (string, error) {
 	log.Infof("Registry Subscribe '%v'", subscriptionName)
-	adapter := registry.subscriptions[subscriptionName]
-	if adapter == nil {
+	//adapter := registry.subscriptions[subscriptionName]
+	value, ok := registry.subscriptions.Load(subscriptionName)
+	if !ok || value == nil {
 		return "", fmt.Errorf("no adapter for event %s", subscriptionName)
+	}
+
+	adapter, ok := value.(*subscriptionAdapter)
+	if !ok {
+		return "", fmt.Errorf("adapter's type is not *subscriptionAdapter")
 	}
 
 	fullSubscriptionName, err := adapter.subscriptionTypesFunc(args)
@@ -88,7 +100,20 @@ func (registry *Registry) Subscribe(subscriptionName string, args []byte) (strin
 func (registry *Registry) CancelSubscription(fullSubscriptionName string) {
 	log.Infof("Registry CancelSubscription '%v'", fullSubscriptionName)
 	subscriptionName := strings.Split(fullSubscriptionName, ":")[0]
-	adapter := registry.subscriptions[subscriptionName]
+
+	//adapter := registry.subscriptions[subscriptionName]
+	value, ok := registry.subscriptions.Load(subscriptionName)
+	if !ok || value == nil {
+		log.Errorf("no adapter for event %s", subscriptionName)
+		return
+	}
+
+	adapter, ok := value.(*subscriptionAdapter)
+	if !ok {
+		log.Errorf("adapter's type is not *subscriptionAdapter")
+		return
+	}
+
 	if adapter != nil {
 		registry.subscriptionRegistry.CancelSubscription(fullSubscriptionName)
 	} else {
@@ -108,9 +133,22 @@ func (registry *Registry) Call(methodName string, args []byte, callback FuncCall
 		}
 	}()
 
-	functionCall := registry.functions[methodName]
+	//functionCall := registry.functions[methodName]
+	value, ok := registry.functions.Load(methodName)
+	if !ok || value == nil {
+		log.Errorf("no function for method %s", methodName)
+		return
+	}
+
+	functionCall, ok := value.(CallFunc)
+	if !ok {
+		log.Errorf("function's type is not CallFunc")
+		return
+	}
+
 	if functionCall != nil {
 		log.Printf("[CALL] methodName %s", methodName)
+		//go functionCall(args, callback)
 		functionCall(args, callback)
 	} else {
 		log.Errorf("methodName not found %s", methodName)
@@ -159,13 +197,15 @@ type subscriptionData struct {
 
 type SubscriptionRegistry struct {
 	callback EventCall
-	active   map[string]*subscriptionData
-	lock     sync.Mutex
+	//active   map[string]*subscriptionData
+	active sync.Map
+	lock   sync.Mutex
 }
 
 func NewSubscriptionRegistry() SubscriptionRegistry {
 	return SubscriptionRegistry{
-		active: make(map[string]*subscriptionData),
+		//active: make(map[string]*subscriptionData),
+		active: sync.Map{},
 	}
 }
 
@@ -177,12 +217,25 @@ func (registry *SubscriptionRegistry) CancelSubscription(fullSubscriptionName st
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subscription := registry.active[fullSubscriptionName]
+	//subscription := registry.active[fullSubscriptionName]
+	value, ok := registry.active.Load(fullSubscriptionName)
+	if !ok || value == nil {
+		log.Errorf("no subscriptionData for event %s", fullSubscriptionName)
+		return
+	}
+
+	subscription, ok := value.(*subscriptionData)
+	if !ok {
+		log.Errorf("subscription's type is not *subscriptionData")
+		return
+	}
+
 	if subscription != nil {
 		subscription.counter--
 		log.Infof("subscription for %s was removed", fullSubscriptionName)
 		if subscription.counter == 0 {
-			delete(registry.active, fullSubscriptionName)
+			//delete(registry.active, fullSubscriptionName)
+			registry.active.Delete(fullSubscriptionName)
 			log.Infof("subscription for %s was completely cancelled", fullSubscriptionName)
 			subscription.subscription.Cancel()
 		}
@@ -196,8 +249,14 @@ func (registry *SubscriptionRegistry) RegisterSubscription(fullSubscriptionName 
 	registry.lock.Lock()
 	defer registry.lock.Unlock()
 
-	subscription := registry.active[fullSubscriptionName]
-	if subscription == nil {
+	//subscription := registry.active[fullSubscriptionName]
+	var subscription *subscriptionData
+	value, ok := registry.active.Load(fullSubscriptionName)
+	if ok {
+		subscription, ok = value.(*subscriptionData)
+	}
+
+	if !ok || subscription == nil {
 		event := NewNamedEvent(fullSubscriptionName, &registry.callback)
 		sub, err := subFunc(args, event)
 		if err != nil {
@@ -208,7 +267,8 @@ func (registry *SubscriptionRegistry) RegisterSubscription(fullSubscriptionName 
 			subscription: sub,
 		}
 
-		registry.active[fullSubscriptionName] = subscription
+		//registry.active[fullSubscriptionName] = subscription
+		registry.active.Store(fullSubscriptionName, subscription)
 	}
 
 	subscription.counter++

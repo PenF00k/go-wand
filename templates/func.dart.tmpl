@@ -5,7 +5,7 @@
 Future<SubscriptionData> {{ $FuncNameLower }}({{ .GetSubscriptionArgsAsDartTypes }}) {
     try {
         SubscriptionBytesCallback callback = (Uint8List bytes) {
-            typedCallback({{ $ReturnTypeName }}.fromBuffer(bytes));
+            typedCallback(bytes != null ? {{ $ReturnTypeName }}.fromBuffer(bytes) : null);
         };
 
         final args = {{ $FuncName }}Args(){{ .BindArgs }};
