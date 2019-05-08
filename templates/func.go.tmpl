@@ -1,4 +1,5 @@
 {{- $Args := .Function.Args -}}
+{{- $ReturnValues := .Function.ReturnValues -}}
 {{- $ProtoPackageName := .CodeList.PackageMap.ProtoPackageName -}}
 {{- define "gen_field" }}
     {{ if .IsPrimitive -}}
@@ -252,10 +253,15 @@ func getEventName{{ .Function.FunctionName }}(argsBytes []byte) (string, error) 
 // function is pure
 func {{ .Function.FunctionName }}(
     {{- range $index, $item := $Args }}
-    {{- $item.Name }} {{ .GetReturnTypeName "" (toBoolPointer .Type.IsPointer) false }}
-    {{- if .NotIsLastField $Args $index }}, {{ end }}
-    {{- end }}) {
-    {{ .Package }}.{{ .Function.FunctionName }}(
+        {{- $item.Name }} {{ .GetReturnTypeName "" (toBoolPointer .Type.IsPointer) false }}
+        {{- if .NotIsLastField $Args $index }}, {{ end }}
+    {{- end }}) (
+    {{- range $index, $item := $ReturnValues }}
+        {{- .GetReturnTypeName "" (toBoolPointer .Type.IsPointer) false }}
+        {{- if .NotIsLastField $ReturnValues $index }}, {{ end }}
+    {{- end -}}
+    ) {
+    {{ if .Function.HasReturnTypes }}return {{ end }}{{ .Package }}.{{ .Function.FunctionName }}(
     {{- range $index, $item := $Args }}
     {{- $item.Name }}
     {{- if .NotIsLastField $Args $index }}, {{ end -}}

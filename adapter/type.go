@@ -348,6 +348,10 @@ func (f Function) GetSubscribeFunctionBaseName() (string, error) {
 	return trimmed, nil
 }
 
+func (f Function) HasReturnTypes() bool {
+	return f.ReturnValues != nil && len(f.ReturnValues) > 0
+}
+
 type Primitive struct {
 	TypeName TypeName
 }

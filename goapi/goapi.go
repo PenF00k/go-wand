@@ -148,8 +148,8 @@ func (registry *Registry) Call(methodName string, args []byte, callback FuncCall
 
 	if functionCall != nil {
 		log.Printf("[CALL] methodName %s", methodName)
-		//go functionCall(args, callback)
-		functionCall(args, callback)
+		go functionCall(args, callback)
+		//functionCall(args, callback)
 	} else {
 		log.Errorf("methodName not found %s", methodName)
 		callback.OnError("no such method: " + methodName)
