@@ -89,6 +89,7 @@ func main() {
 		"./data",
 		"https://retro.vmassive.ru/graphql",
 		"wss://retro.vmassive.ru/subscriptions",
+		false,
 		true)
 	hub := remgo.NewHub()
 	remgo.ServeWs(&registry, hub, {{ .CodeList.Port }})

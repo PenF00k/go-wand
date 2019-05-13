@@ -250,6 +250,10 @@ func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 		//log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
 		return
 	}
+	if strings.HasPrefix(funcDecl.Name.Name, "Test") {
+		//log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
+		return
+	}
 
 	functionData := createFunctionData(funcDecl)
 	codeList.AddFunctionData(functionData)
