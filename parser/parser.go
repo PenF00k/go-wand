@@ -250,6 +250,10 @@ func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 		//log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
 		return
 	}
+	if strings.HasPrefix(funcDecl.Name.Name, "Test") {
+		//log.Warnf("skipping unexported function %s", funcDecl.Name.Name)
+		return
+	}
 
 	functionData := createFunctionData(funcDecl)
 	codeList.AddFunctionData(functionData)
@@ -258,7 +262,7 @@ func createFunction(codeList *generator.CodeList, funcDecl *ast.FuncDecl) {
 func createFunctionData(funcDecl *ast.FuncDecl) generator.FunctionData {
 	comments := getComments(funcDecl.Doc)
 	isSubscription := checkIsSubscription(funcDecl.Type)
-	isPure := funcDecl.Type.Results == nil || funcDecl.Type.Results.List == nil || len(funcDecl.Type.Results.List) == 0
+	isPure := funcDecl.Type.Results == nil || funcDecl.Type.Results.List == nil || len(funcDecl.Type.Results.List) == 0 || strings.HasPrefix(funcDecl.Name.Name, "Pure")
 	name := funcDecl.Name.Name
 	args := funcDecl.Type.Params
 	returnValues := funcDecl.Type.Results
