@@ -44,7 +44,7 @@ func (t TemplateStructData) CompareOldAndNewArgs() string {
 	res := strings.Builder{}
 	for i, v := range args {
 		if i != 0 {
-			res.WriteString(" && ")
+			res.WriteString(" || ")
 		}
 		s := fmt.Sprintf("widget.%s != oldWidget.%[1]s", v.Name)
 		res.WriteString(s)
