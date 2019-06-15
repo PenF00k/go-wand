@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gitlab.vmassive.ru/wand/config"
 	"gitlab.vmassive.ru/wand/generator"
 	"gitlab.vmassive.ru/wand/parser"
 	"gitlab.vmassive.ru/wand/util"
@@ -12,7 +13,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"gitlab.vmassive.ru/wand/config"
 	"gitlab.vmassive.ru/wand/reload"
 
 	"github.com/fsnotify/fsnotify"
