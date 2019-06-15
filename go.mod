@@ -1,4 +1,4 @@
-module go/wand
+module gitlab.vmassive.ru/go/wand
 
 go 1.12
 
