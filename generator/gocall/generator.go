@@ -3,9 +3,9 @@ package gocall
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"gitlab.vmassive.ru/wand/adapter"
-	"gitlab.vmassive.ru/wand/generator"
-	"gitlab.vmassive.ru/wand/util"
+	"github.com/PenF00k/go-wand/adapter"
+	"github.com/PenF00k/go-wand/generator"
+	"github.com/PenF00k/go-wand/util"
 	"io"
 	"os"
 	"os/exec"

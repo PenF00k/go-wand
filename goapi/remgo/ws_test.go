@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/sirupsen/logrus"
-	"gitlab.vmassive.ru/wand/goapi/remgo/generated"
+	"github.com/PenF00k/go-wand/goapi/remgo/generated"
 	"google.golang.org/grpc"
 	"io"
 	"testing"

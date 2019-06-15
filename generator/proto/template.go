@@ -2,8 +2,8 @@ package proto
 
 import (
 	"fmt"
-	"gitlab.vmassive.ru/wand/adapter"
-	"gitlab.vmassive.ru/wand/generator/formatter"
+	"github.com/PenF00k/go-wand/adapter"
+	"github.com/PenF00k/go-wand/generator/formatter"
 )
 
 type TemplateStructData struct {

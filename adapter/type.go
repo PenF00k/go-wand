@@ -3,7 +3,7 @@ package adapter
 import (
 	"fmt"
 	"github.com/iancoleman/strcase"
-	"gitlab.vmassive.ru/wand/generator/formatter"
+	"github.com/PenF00k/go-wand/generator/formatter"
 	"go/ast"
 	"strings"
 )

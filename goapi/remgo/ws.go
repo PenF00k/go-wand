@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gitlab.vmassive.ru/wand/goapi/remgo/generated"
+	"github.com/PenF00k/go-wand/goapi/remgo/generated"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"net"
@@ -18,10 +18,10 @@ import (
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.vmassive.ru/wand/goapi"
+	"github.com/PenF00k/go-wand/goapi"
 )
 
-//protoc --proto_path=/Users/viktorloskutov/gopath/src/cliwand/proto_client --go_out=plugins=grpc:/Users/viktorloskutov/gopath/src/gitlab.vmassive.ru/wand/goapi/remgo/generated debugwebsocket.proto
+//protoc --proto_path=/Users/viktorloskutov/gopath/src/cliwand/proto_client --go_out=plugins=grpc:/Users/viktorloskutov/gopath/src/github.com/PenF00k/go-wand/goapi/remgo/generated debugwebsocket.proto
 //protoc --proto_path=/Users/viktorloskutov/gopath/src/cliwand/proto_client --dart_out=grpc:/Users/viktorloskutov/code/client-pik-remont/client_pik_remont/lib/go_client/proto/generated debugwebsocket.proto
 
 // serveWs handles websocket requests from the peer.

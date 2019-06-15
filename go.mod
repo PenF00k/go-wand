@@ -11,9 +11,8 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/urfave/cli v1.20.0
-	gitlab.vmassive.ru/wand v0.0.0
 	google.golang.org/grpc v1.21.1
 	gopkg.in/yaml.v2 v2.2.2
 )
 
-replace gitlab.vmassive.ru/wand => ./
+replace github.com/PenF00k/go-wand => ./

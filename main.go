@@ -1,10 +1,10 @@
 package main
 
 import (
-	"gitlab.vmassive.ru/wand/config"
-	"gitlab.vmassive.ru/wand/generator"
-	"gitlab.vmassive.ru/wand/parser"
-	"gitlab.vmassive.ru/wand/util"
+	"github.com/PenF00k/go-wand/config"
+	"github.com/PenF00k/go-wand/generator"
+	"github.com/PenF00k/go-wand/parser"
+	"github.com/PenF00k/go-wand/util"
 	"go/build"
 	"os"
 	"os/signal"
@@ -13,7 +13,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"gitlab.vmassive.ru/wand/reload"
+	"github.com/PenF00k/go-wand/reload"
 
 	"github.com/fsnotify/fsnotify"
 )

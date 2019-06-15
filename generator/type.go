@@ -1,7 +1,7 @@
 package generator
 
 import (
-	"gitlab.vmassive.ru/wand/config"
+	"github.com/PenF00k/go-wand/config"
 	"go/ast"
 )
 

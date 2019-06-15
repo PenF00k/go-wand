@@ -12,8 +12,8 @@ import (
 
 	"github.com/iancoleman/strcase"
 	log "github.com/sirupsen/logrus"
-	"gitlab.vmassive.ru/wand/assets"
-	"gitlab.vmassive.ru/wand/generator"
+	"github.com/PenF00k/go-wand/assets"
+	"github.com/PenF00k/go-wand/generator"
 )
 
 type Field struct {

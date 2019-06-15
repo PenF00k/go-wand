@@ -8,12 +8,12 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gitlab.vmassive.ru/client"
 	"{{ .CodeList.PathMap.ProtoRel }}"
-	"gitlab.vmassive.ru/wand/goapi"
+	"github.com/PenF00k/go-wand/goapi"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"strconv"
 	"time"
 	{{if .CodeList.Dev -}}
-		"gitlab.vmassive.ru/wand/goapi/remgo"
+		"github.com/PenF00k/go-wand/goapi/remgo"
 	{{- end}}
 )
 

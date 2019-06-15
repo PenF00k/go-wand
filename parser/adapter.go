@@ -2,8 +2,8 @@ package parser
 
 import (
 	"fmt"
-	"gitlab.vmassive.ru/wand/adapter"
-	"gitlab.vmassive.ru/wand/generator"
+	"github.com/PenF00k/go-wand/adapter"
+	"github.com/PenF00k/go-wand/generator"
 	"go/ast"
 )
 
