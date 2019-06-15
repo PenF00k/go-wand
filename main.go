@@ -33,7 +33,7 @@ func main() {
 		},
 		cli.BoolFlag{
 			Name:  "release",
-			Usage: "contruct release",
+			Usage: "build release",
 		},
 		cli.BoolFlag{
 			Name:  "genDartDto",
@@ -89,7 +89,17 @@ func runApplication(configName string, dev bool, genDartDto bool, skipGenDart bo
 	goPath := getGoPath()
 
 	fullGoSourcePath := path.Join(goPath, "src", configuration.Source.Package)
+	if configuration.Source.IsGoModule == "true" {
+		fullGoSourcePath = configuration.Source.Package
+	}
+
 	targetGoCallPath := path.Join(goPath, "src", configuration.Wrapper.Package)
+	if configuration.Wrapper.IsGoModule == "true" {
+		targetGoCallPath = configuration.Wrapper.Package
+	}
+
+	log.Printf("fullGoSourcePath: %v", fullGoSourcePath)
+	log.Printf("targetGoCallPath: %v", targetGoCallPath)
 
 	createDirectory(targetGoCallPath)
 	createDirectory(configuration.Js.Path)
@@ -97,7 +107,10 @@ func runApplication(configName string, dev bool, genDartDto bool, skipGenDart bo
 	protoPackageName := "proto_client"
 
 	protoPath := path.Join(targetGoCallPath, protoPackageName)
+	log.Printf("protoPath: %v", protoPath)
 	protoRelPath := path.Join(configuration.Wrapper.Package, protoPackageName)
+	log.Printf("protoRelPath: %v", protoRelPath)
+
 	createDirectory(protoPath)
 
 	workingDir, err := os.Getwd()

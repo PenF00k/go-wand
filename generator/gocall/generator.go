@@ -50,7 +50,7 @@ func (gen GoCodeGenerator) CreateCode() error {
 
 func (gen GoCodeGenerator) writeCode() error {
 	outFile := "call.go"
-	log.Printf("createing %s", outFile)
+	log.Printf("creating %s", outFile)
 
 	f, err := os.Create(path.Join(gen.outDirectory, outFile))
 	if err != nil {

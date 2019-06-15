@@ -12,7 +12,8 @@ import (
 )
 
 type Source struct {
-	Package string
+	Package    string
+	IsGoModule string `yaml:"is_go_module"`
 }
 
 type Js struct {
@@ -33,8 +34,9 @@ type Java struct {
 }
 
 type Wrapper struct {
-	Package string
-	Port    int16
+	Package    string
+	IsGoModule string `yaml:"is_go_module"`
+	Port       int16
 }
 
 type Configuration struct {
