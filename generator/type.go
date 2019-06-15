@@ -64,3 +64,13 @@ func (list *CodeList) AddStructData(structure StructData) {
 func (list *CodeList) AddFunctionData(function FunctionData) {
 	list.FunctionData = append(list.FunctionData, function)
 }
+
+func (list *CodeList) HasSubscriptions() bool {
+	for _, v := range list.FunctionData {
+		if v.IsSubscription {
+			return true
+		}
+	}
+
+	return false
+}

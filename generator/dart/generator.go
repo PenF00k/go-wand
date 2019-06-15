@@ -134,6 +134,10 @@ func (gen CodeGenerator) createFunction(function adapter.Function) TemplateStruc
 }
 
 func (gen CodeGenerator) writeWithFunctionsCode() error {
+	if !gen.CodeList.HasSubscriptions() {
+		return nil
+	}
+
 	outFile := gen.Package + ".with.dart"
 	log.Printf("creating %s", outFile)
 

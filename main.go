@@ -39,12 +39,16 @@ func main() {
 			Name:  "genDartDto",
 			Usage: "generate only dart dto classes (for instance for shared library)",
 		},
+		cli.BoolFlag{
+			Name:  "skipGenDart",
+			Usage: "skip generating dart dto classes",
+		},
 	}
 
 	app.Name = "wand"
 	app.Usage = "magic link between go and js"
 	app.Action = func(c *cli.Context) error {
-		runApplication(c.String("config"), !c.Bool("release"), c.Bool("genDartDto"))
+		runApplication(c.String("config"), !c.Bool("release"), c.Bool("genDartDto"), c.Bool("skipGenDart"))
 		return nil
 	}
 
@@ -76,7 +80,7 @@ func getGoPath() string {
 	return gopath
 }
 
-func runApplication(configName string, dev bool, genDartDto bool) {
+func runApplication(configName string, dev bool, genDartDto bool, skipGenDart bool) {
 	configuration, err := config.ReadConfig(configName)
 	if err != nil {
 		return
@@ -125,7 +129,7 @@ func runApplication(configName string, dev bool, genDartDto bool) {
 		FlutterAppPackage: configuration.Flutter.AppPackage,
 	}
 
-	goPackageName := configuration.Wrapper.Package
+	goPackageName := path.Base(configuration.Wrapper.Package)
 	if dev {
 		goPackageName = "main"
 	}
@@ -142,19 +146,19 @@ func runApplication(configName string, dev bool, genDartDto bool) {
 	}
 
 	if genDartDto {
-		parser.Parse(codeList, genDartDto)
+		parser.Parse(codeList, genDartDto, skipGenDart)
 		return
 	}
 
 	if dev {
-		watchGo(codeList)
+		watchGo(codeList, skipGenDart)
 	} else {
-		parser.Parse(codeList, false)
+		parser.Parse(codeList, false, skipGenDart)
 	}
 }
 
-func watchGo(codeList *generator.CodeList) {
-	parser.Parse(codeList, false)
+func watchGo(codeList *generator.CodeList, skipGenDart bool) {
+	parser.Parse(codeList, false, skipGenDart)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -191,7 +195,7 @@ func watchGo(codeList *generator.CodeList) {
 					event.Op&fsnotify.Rename == fsnotify.Rename ||
 					event.Op&fsnotify.Create == fsnotify.Create {
 					log.Println("modified file:", event.Name)
-					parser.Parse(codeList, false)
+					parser.Parse(codeList, false, skipGenDart)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {

@@ -78,7 +78,7 @@ func (t Type) GetWrapperName(toPointer *bool, reverse bool) string {
 	sign := getPointerSign(toPointer)
 
 	if t.IsPrimitivePointer() {
-		protoType := format.BasicGoTypeFormatter.Format(string(t.Pointer.InnerType.Name))
+		protoType := format.BasicProtoTypeFormatter.Format(string(t.Pointer.InnerType.Name))
 		return fmt.Sprintf("%swrappers.%vValue", sign, strcase.ToCamel(protoType))
 	} else if t.IsPrimitive {
 		//return string(t.Name)
