@@ -1,4 +1,4 @@
-module wand
+module go/wand
 
 go 1.12
 
